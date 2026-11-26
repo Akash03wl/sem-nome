@@ -91,4 +91,24 @@ describe("Panel", () => {
     await userEvent.click(screen.getByRole("button", { name: "Adicionar palavra-chave" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Essa palavra-chave já existe.");
   });
+
+  it("mostra Everything funcionando", () => {
+    setup({ initialSection: "config", everythingStatus: "ready", onEverythingFix: vi.fn(async () => null) });
+    expect(screen.getByText("Busca de arquivos (Everything)")).toBeInTheDocument();
+    expect(screen.getByText("Funcionando")).toBeInTheDocument();
+  });
+
+  it("oferece instalar quando falta", async () => {
+    const fix = vi.fn(async () => null);
+    setup({ initialSection: "config", everythingStatus: "notInstalled", onEverythingFix: fix });
+    await userEvent.click(screen.getByRole("button", { name: "Instalar Everything" }));
+    expect(fix).toHaveBeenCalledWith("notInstalled");
+  });
+
+  it("oferece abrir quando está fechado", async () => {
+    const fix = vi.fn(async () => null);
+    setup({ initialSection: "config", everythingStatus: "notRunning", onEverythingFix: fix });
+    await userEvent.click(screen.getByRole("button", { name: "Abrir Everything" }));
+    expect(fix).toHaveBeenCalledWith("notRunning");
+  });
 });

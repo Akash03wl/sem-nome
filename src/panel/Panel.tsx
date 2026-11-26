@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
-import { ACCENTS, ACCENT_NAMES, type Settings } from "../lib/types";
+import { ACCENTS, ACCENT_NAMES, EVERYTHING_MESSAGE, type EverythingStatus, type Settings } from "../lib/types";
 import { formatHotkey } from "../quick/QuickLauncher";
 import "./Panel.css";
 
@@ -14,9 +14,12 @@ export interface PanelProps {
   onSave(next: Settings): Promise<string | null>;
   /** Conteúdo da seção "Itens" (a `ItemsSection`, montada pelo app). */
   itemsSection?: ReactNode;
+  /** Status do Everything (busca de arquivos); `null` enquanto verifica. */
+  everythingStatus?: EverythingStatus | null;
+  onEverythingFix?(status: EverythingStatus): Promise<string | null>;
 }
 
-export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSection }: PanelProps) {
+export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSection, everythingStatus, onEverythingFix }: PanelProps) {
   const [section, setSection] = useState<Section>(initialSection ?? (hotkeyError ? "config" : "itens"));
   const [current, setCurrent] = useState(settings);
   const [draft, setDraft] = useState(settings.hotkey);
@@ -149,6 +152,34 @@ export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSect
                 ))}
               </div>
             </div>
+
+            {everythingStatus !== undefined && (
+              <div className="panel-row">
+                <div className="panel-row-text">
+                  <span>Busca de arquivos (Everything)</span>
+                  <span className="panel-hint">
+                    {everythingStatus === null
+                      ? "Verificando…"
+                      : everythingStatus === "ready"
+                        ? "Funcionando"
+                        : EVERYTHING_MESSAGE[everythingStatus].text}
+                  </span>
+                </div>
+                {everythingStatus && everythingStatus !== "ready" && EVERYTHING_MESSAGE[everythingStatus].action && onEverythingFix && (
+                  <button
+                    type="button"
+                    className="panel-btn"
+                    onClick={async () => {
+                      const err = await onEverythingFix(everythingStatus);
+                      setError(err);
+                      if (!err) setSaved("Pronto! Pode levar alguns segundos para o Everything terminar de abrir.");
+                    }}
+                  >
+                    {EVERYTHING_MESSAGE[everythingStatus].action}
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="panel-row panel-shortcuts">
               <div className="panel-row-text">

@@ -106,6 +106,14 @@ function PanelItems() {
 
 function PanelApp() {
   const settings = useSettings();
+  const [everything, setEverything] = useState<import("./lib/types").EverythingStatus | null>(null);
+  const refreshEverything = () => void api.everythingStatus().then(setEverything);
+  useEffect(() => {
+    refreshEverything();
+    // O Everything pode ser instalado ou aberto por fora: confere de tempos em tempos.
+    const timer = setInterval(refreshEverything, 15000);
+    return () => clearInterval(timer);
+  }, []);
   const [hotkeyError, setHotkeyError] = useState<string | null | undefined>(undefined);
   useEffect(() => {
     api.getHotkeyError().then(setHotkeyError);
@@ -118,6 +126,12 @@ function PanelApp() {
       initialSection={hotkeyError ? "config" : "itens"}
       onSave={api.saveSettings}
       itemsSection={<PanelItems />}
+      everythingStatus={everything}
+      onEverythingFix={async (status) => {
+        const err = await api.fixEverything(status);
+        setTimeout(refreshEverything, 3000);
+        return err;
+      }}
     />
   );
 }
