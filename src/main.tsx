@@ -60,6 +60,10 @@ function QuickApp() {
       onLaunch={api.launchItem}
       onApply={api.applyOp}
       onReveal={api.revealItem}
+      shortcuts={settings.webShortcuts ?? []}
+      onSystem={api.runSystemCommand}
+      onOpenUrl={api.openUrl}
+      onCopy={api.copyText}
     />
   );
 }

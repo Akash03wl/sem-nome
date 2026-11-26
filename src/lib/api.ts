@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { Discovered, LibOp, Library, Settings } from "./types";
+import type { Discovered, LibOp, Library, Settings, SystemCommand } from "./types";
 
 export const getSettings = () => invoke<Settings>("get_settings");
 
@@ -75,3 +75,18 @@ export const onLibraryChanged = (cb: (l: Library) => void): Promise<UnlistenFn> 
 
 export const onAppsDiscovered = (cb: (d: Discovered[]) => void): Promise<UnlistenFn> =>
   listen<Discovered[]>("apps-discovered", (e) => cb(e.payload));
+
+// ---- Busca e comandos (Fase 3) ----
+
+export const openUrl = (url: string) => attempt(() => invoke("open_url", { url }), "Não consegui abrir o endereço.");
+
+export const runSystemCommand = (cmd: SystemCommand) =>
+  attempt(() => invoke("run_system_command", { cmd }), "Não consegui executar o comando.");
+
+export async function copyText(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Área de transferência indisponível: nada a fazer além de não travar.
+  }
+}

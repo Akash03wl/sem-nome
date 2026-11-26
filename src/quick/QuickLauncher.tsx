@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
-import type { Discovered, LibOp, Library } from "../lib/types";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { SYSTEM_COMMANDS, type Discovered, type LibOp, type Library, type SystemCommand, type WebShortcut } from "../lib/types";
 import { useIcon } from "../lib/useIcon";
 import { ItemTile } from "../items/ItemTile";
 import { ContextMenu, type MenuAction } from "../items/ContextMenu";
@@ -12,6 +12,8 @@ import {
   visibleDiscovered,
   type Entry,
 } from "../items/actions";
+import { search, type SearchResult } from "../search/search";
+import { useConfirm } from "./useConfirm";
 import "./QuickLauncher.css";
 
 export interface QuickLauncherProps {
@@ -27,6 +29,10 @@ export interface QuickLauncherProps {
   onLaunch(id: string, admin?: boolean): Promise<string | null>;
   onApply(op: LibOp): Promise<string | null>;
   onReveal(id: string): Promise<string | null>;
+  shortcuts: WebShortcut[];
+  onSystem(cmd: SystemCommand): Promise<string | null>;
+  onOpenUrl(url: string): Promise<string | null>;
+  onCopy(text: string): Promise<void>;
 }
 
 const KEY_NAMES: Record<string, string> = { Space: "Espaço", Super: "Win", Esc: "Esc" };
@@ -42,15 +48,15 @@ export function formatHotkey(hotkey: string): string {
     .join("+");
 }
 
-/** Comandos do PC: os botões funcionam a partir da Fase 3. */
-const COMMANDS: { label: string; path: string }[] = [
-  { label: "Desligar", path: "M12 3v8M6.3 7.3a8 8 0 1 0 11.4 0" },
-  { label: "Reiniciar", path: "M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" },
-  { label: "Suspender", path: "M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" },
-  { label: "Bloquear", path: "M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z" },
-  { label: "Sair da conta", path: "M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10" },
-  { label: "Esvaziar lixeira", path: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" },
-];
+const GROUP_TITLE: Record<SearchResult["type"], string> = {
+  calc: "Calculadora",
+  web: "Internet",
+  item: "Itens",
+  command: "Comandos do PC",
+};
+
+/** "Desligar" → "desligar"; usado em "Clique de novo para desligar". */
+const lower = (label: string) => label.charAt(0).toLowerCase() + label.slice(1);
 
 type Section = "fav" | "all" | string;
 
@@ -79,6 +85,10 @@ function Tile(props: {
 export function QuickLauncher(props: QuickLauncherProps) {
   const { accent, hotkeyLabel, showNonce, library, discovered, onHide, onOpenPanel, onLaunch } = props;
   const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const confirm = useConfirm();
+  const listRef = useRef<HTMLDivElement>(null);
   const [section, setSection] = useState<Section>("fav");
   const [error, setError] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; entry: Entry } | null>(null);
@@ -88,6 +98,21 @@ export function QuickLauncher(props: QuickLauncherProps) {
   const favorites = itemsByIds(library, library.favorites);
   const category = library.categories.find((c) => c.id === section);
   const allApps = visibleDiscovered(library, discovered);
+  const results = useMemo(
+    () => search(query, { library, discovered, shortcuts: props.shortcuts }),
+    [query, library, discovered, props.shortcuts],
+  );
+  const searching = query.trim() !== "";
+
+  useEffect(() => {
+    setSelected(0);
+    setCopied(false);
+    confirm.reset();
+  }, [query]);
+
+  useEffect(() => {
+    listRef.current?.querySelector<HTMLElement>("[aria-selected=true]")?.scrollIntoView?.({ block: "nearest" });
+  }, [selected]);
 
   useEffect(() => {
     setQuery("");
@@ -112,6 +137,34 @@ export function QuickLauncher(props: QuickLauncherProps) {
     [onLaunch, onHide],
   );
 
+  /** Comando do PC, com segundo clique/Enter quando ele pede confirmação. */
+  async function runCommand(cmd: SystemCommand) {
+    const info = SYSTEM_COMMANDS.find((c) => c.id === cmd);
+    if (info?.needsConfirm && !confirm.ask(cmd)) return;
+    const err = await props.onSystem(cmd);
+    if (err) setError(err);
+    else onHide();
+  }
+
+  async function activate(r: SearchResult, mods: { ctrl: boolean; shift: boolean }) {
+    if (r.type === "calc") {
+      await props.onCopy(String(r.value));
+      setCopied(true);
+    } else if (r.type === "web") {
+      const err = await props.onOpenUrl(r.url);
+      if (err) setError(err);
+      else onHide();
+    } else if (r.type === "item") {
+      if (mods.shift) setError(await props.onReveal(r.id));
+      else await open(r.id, mods.ctrl);
+    } else {
+      await runCommand(r.command);
+    }
+  }
+
+  const keyState = useRef({ results, selected, searching });
+  keyState.current = { results, selected, searching };
+
   useEffect(() => {
     // Limpa ao esconder (e não só ao mostrar), para o texto antigo nunca piscar na reabertura.
     const onKey = (e: KeyboardEvent) => {
@@ -119,6 +172,21 @@ export function QuickLauncher(props: QuickLauncherProps) {
         e.preventDefault();
         setQuery("");
         onHide();
+        return;
+      }
+      const ks = keyState.current;
+      if (ks.searching && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        e.preventDefault();
+        const n = ks.results.length;
+        if (n) setSelected((i) => (e.key === "ArrowDown" ? (i + 1) % n : (i - 1 + n) % n));
+        return;
+      }
+      if (ks.searching && e.key === "Enter" && !e.altKey) {
+        const r = ks.results[ks.selected];
+        if (r) {
+          e.preventDefault();
+          void activateRef.current(r, { ctrl: e.ctrlKey, shift: e.shiftKey });
+        }
         return;
       }
       if (e.altKey && !e.ctrlKey && !e.metaKey) {
@@ -138,6 +206,9 @@ export function QuickLauncher(props: QuickLauncherProps) {
       window.removeEventListener("blur", onBlur);
     };
   }, [onHide, favorites, open]);
+
+  const activateRef = useRef(activate);
+  activateRef.current = activate;
 
   async function onMenuAction(action: MenuAction) {
     if (!menu) return;
@@ -170,6 +241,39 @@ export function QuickLauncher(props: QuickLauncherProps) {
     />
   );
   const owned = (ids: string[]) => itemsByIds(library, ids).map((item) => ({ item, fromAll: false as const }));
+
+  function renderResult(r: SearchResult) {
+    const mods = { ctrl: false, shift: false };
+    if (r.type === "item") {
+      return (
+        <Tile
+          entry={r.entry}
+          size="row"
+          onOpen={() => void activate(r, mods)}
+          onContext={(pos) => setMenu({ ...pos, entry: r.entry })}
+        />
+      );
+    }
+    let title: string;
+    let detail: string;
+    if (r.type === "calc") {
+      title = `= ${r.text}`;
+      detail = copied ? "Copiado!" : "Enter copia";
+    } else if (r.type === "web") {
+      title = r.title;
+      detail = "Enter abre";
+    } else {
+      const armed = confirm.armed === r.command;
+      title = armed ? `Pressione Enter de novo para ${lower(r.label)}` : r.label;
+      detail = SYSTEM_COMMANDS.find((c) => c.id === r.command)?.needsConfirm ? "Pede confirmação" : "";
+    }
+    return (
+      <button type="button" className="quick-result-btn" onClick={() => void activate(r, mods)}>
+        <span className="quick-result-title">{title}</span>
+        {detail && <span className="quick-result-detail">{detail}</span>}
+      </button>
+    );
+  }
 
   const navButton = (id: Section, label: string, count?: number) => (
     <button
@@ -232,8 +336,29 @@ export function QuickLauncher(props: QuickLauncherProps) {
           </form>
         )}
 
-        <div className="quick-content">
-          {section === "fav" && (
+        <div className="quick-content" ref={listRef}>
+          {searching && (
+            <div role="listbox" aria-label="Resultados" className="quick-results">
+              {results.length === 0 && (
+                <p className="quick-empty">Nada encontrado. Dica: g + espaço + texto pesquisa no Google.</p>
+              )}
+              {results.map((r, i) => (
+                <div key={r.id} className="quick-result-wrap">
+                  {(i === 0 || results[i - 1].type !== r.type) && <h2 className="quick-label">{GROUP_TITLE[r.type]}</h2>}
+                  <div
+                    role="option"
+                    aria-selected={i === selected}
+                    className={i === selected ? "quick-result is-selected" : "quick-result"}
+                    onMouseMove={() => setSelected(i)}
+                  >
+                    {renderResult(r)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!searching && section === "fav" && (
             <>
               <section className="quick-section" aria-label="Favoritos">
                 <h2 className="quick-label">Favoritos</h2>
@@ -256,7 +381,7 @@ export function QuickLauncher(props: QuickLauncherProps) {
             </>
           )}
 
-          {category && (
+          {!searching && category && (
             <section className="quick-section" aria-label={category.name}>
               <h2 className="quick-label">{category.name}</h2>
               {category.items.length === 0 ? (
@@ -267,7 +392,7 @@ export function QuickLauncher(props: QuickLauncherProps) {
             </section>
           )}
 
-          {section === "all" && (
+          {!searching && section === "all" && (
             <section className="quick-section" aria-label="Todos">
               <h2 className="quick-label">Todos os programas</h2>
               {allApps.length === 0 ? (
@@ -280,17 +405,29 @@ export function QuickLauncher(props: QuickLauncherProps) {
         </div>
 
         <section className="quick-commands" aria-label="Comandos do PC">
-          {COMMANDS.map((c) => (
-            <button key={c.label} type="button" className="quick-cmd" disabled title={`${c.label} (em breve)`} aria-label={c.label}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d={c.path} />
-              </svg>
-            </button>
-          ))}
+          {SYSTEM_COMMANDS.map((c) => {
+            const armed = confirm.armed === c.id;
+            const label = armed ? `Clique de novo para ${lower(c.label)}` : c.label;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                className={armed ? "quick-cmd is-armed" : "quick-cmd"}
+                title={label}
+                aria-label={label}
+                onClick={() => void runCommand(c.id)}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d={c.icon} />
+                </svg>
+              </button>
+            );
+          })}
+          {confirm.armed && <span className="quick-cmd-hint">Clique de novo para confirmar</span>}
         </section>
 
         <footer className="quick-footer">
-          <span>↵ abrir · Esc fechar · Alt+1…6 favoritos</span>
+          <span>↑↓ escolher · ↵ abrir · Ctrl+↵ admin · Esc fechar</span>
           <button type="button" className="quick-link" onClick={onOpenPanel}>
             Abrir painel ›
           </button>

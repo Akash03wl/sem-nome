@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { QuickLauncher, formatHotkey } from "./QuickLauncher";
@@ -34,6 +34,10 @@ function setup(over: Partial<Parameters<typeof QuickLauncher>[0]> = {}) {
     onLaunch: vi.fn(async (_id: string, _admin?: boolean) => null as string | null),
     onApply: vi.fn(async () => null as string | null),
     onReveal: vi.fn(async () => null as string | null),
+    shortcuts: [{ keyword: "yt", name: "YouTube", url: "https://www.youtube.com/results?search_query={q}" }],
+    onSystem: vi.fn(async () => null as string | null),
+    onOpenUrl: vi.fn(async () => null as string | null),
+    onCopy: vi.fn(async () => {}),
     ...over,
   };
   const utils = render(<QuickLauncher {...props} />);
@@ -165,5 +169,97 @@ describe("QuickLauncher com itens", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(props.onHide).not.toHaveBeenCalled();
+  });
+});
+
+describe("QuickLauncher busca", () => {
+  const typeQuery = async (text: string) => {
+    await userEvent.type(screen.getByPlaceholderText("Buscar programas, pastas, sites…"), text);
+  };
+
+  it("mostra resultados ao digitar", async () => {
+    setup({ library });
+    await typeQuery("gam");
+    const list = screen.getByRole("listbox", { name: "Resultados" });
+    expect(list).toHaveTextContent("Gamma");
+    expect(list).not.toHaveTextContent("Alpha");
+  });
+
+  it("setas e Enter abrem o selecionado", async () => {
+    const { props } = setup({ library: { ...library, items: [...library.items, item("d", "Alphabet")] } });
+    await typeQuery("alp");
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    expect(props.onLaunch).toHaveBeenCalledWith("d", false);
+    await vi.waitFor(() => expect(props.onHide).toHaveBeenCalled());
+  });
+
+  it("Ctrl+Enter abre como administrador e Shift+Enter abre o local", async () => {
+    const { props } = setup({ library });
+    await typeQuery("alpha");
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    expect(props.onLaunch).toHaveBeenCalledWith("a", true);
+    await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(props.onReveal).toHaveBeenCalledWith("a");
+  });
+
+  it("calc: Enter copia", async () => {
+    const { props } = setup();
+    await typeQuery("250*12");
+    expect(screen.getByRole("listbox", { name: "Resultados" })).toHaveTextContent("3.000");
+    await userEvent.keyboard("{Enter}");
+    expect(props.onCopy).toHaveBeenCalledWith("3000");
+    expect(await screen.findByText("Copiado!")).toBeInTheDocument();
+    expect(props.onHide).not.toHaveBeenCalled();
+  });
+
+  it("web: Enter abre a pesquisa", async () => {
+    const { props } = setup();
+    await typeQuery("yt lofi");
+    expect(screen.getByRole("listbox", { name: "Resultados" })).toHaveTextContent("Pesquisar “lofi” no YouTube");
+    await userEvent.keyboard("{Enter}");
+    expect(props.onOpenUrl).toHaveBeenCalledWith("https://www.youtube.com/results?search_query=lofi");
+    await vi.waitFor(() => expect(props.onHide).toHaveBeenCalled());
+  });
+
+  it("comando na busca pede Enter duas vezes", async () => {
+    const { props } = setup();
+    await typeQuery("desligar");
+    await userEvent.keyboard("{Enter}");
+    expect(props.onSystem).not.toHaveBeenCalled();
+    expect(screen.getByRole("listbox", { name: "Resultados" })).toHaveTextContent("Pressione Enter de novo para desligar");
+    await userEvent.keyboard("{Enter}");
+    expect(props.onSystem).toHaveBeenCalledWith("shutdown");
+  });
+
+  it("nada encontrado mostra dica", async () => {
+    setup();
+    await typeQuery("zzzz");
+    expect(screen.getByText(/Nada encontrado/)).toBeInTheDocument();
+  });
+});
+
+describe("QuickLauncher comandos do PC", () => {
+  it("desligar pede confirmação", () => {
+    vi.useFakeTimers();
+    try {
+      const { props } = setup();
+      const btn = screen.getByRole("button", { name: "Desligar" });
+      fireEvent.click(btn);
+      expect(props.onSystem).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Clique de novo para desligar" })).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(3100));
+      fireEvent.click(screen.getByRole("button", { name: "Desligar" }));
+      expect(props.onSystem).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "Clique de novo para desligar" }));
+      expect(props.onSystem).toHaveBeenCalledWith("shutdown");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("bloquear não pede confirmação", async () => {
+    const { props } = setup();
+    await userEvent.click(screen.getByRole("button", { name: "Bloquear" }));
+    expect(props.onSystem).toHaveBeenCalledWith("lock");
   });
 });
