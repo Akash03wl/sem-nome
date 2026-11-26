@@ -1,8 +1,9 @@
 //! Configurações do Vitra, gravadas em JSON com backup da versão anterior.
 
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+
+use crate::store;
 
 /// Cores de destaque permitidas (roxo, verde-água, laranja, azul).
 pub const ACCENTS: [&str; 4] = ["#9b82ff", "#3fd0c9", "#ff8a4c", "#4c9dff"];
@@ -27,23 +28,10 @@ impl Default for Settings {
     }
 }
 
-fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
-    let mut name = path.as_os_str().to_owned();
-    name.push(suffix);
-    PathBuf::from(name)
-}
-
-fn read(path: &Path) -> Option<Settings> {
-    let text = fs::read_to_string(path).ok()?;
-    serde_json::from_str(&text).ok()
-}
-
 /// Lê as configurações. Se o arquivo faltar ou estiver corrompido, tenta o
 /// backup `.bak`; se nada servir, devolve os padrões. Nunca falha.
 pub fn load(path: &Path) -> Settings {
-    let mut s = read(path)
-        .or_else(|| read(&with_suffix(path, ".bak")))
-        .unwrap_or_default();
+    let mut s: Settings = store::load_json(path).unwrap_or_default();
     if !ACCENTS.contains(&s.accent.as_str()) {
         s.accent = ACCENTS[0].into();
     }
@@ -52,16 +40,7 @@ pub fn load(path: &Path) -> Settings {
 
 /// Grava as configurações de forma atômica, guardando a versão anterior em `.bak`.
 pub fn save(path: &Path, s: &Settings) -> std::io::Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    if path.exists() {
-        fs::copy(path, with_suffix(path, ".bak"))?;
-    }
-    let tmp = with_suffix(path, ".tmp");
-    let json = serde_json::to_string_pretty(s).map_err(std::io::Error::other)?;
-    fs::write(&tmp, json)?;
-    fs::rename(&tmp, path)
+    store::save_json(path, s)
 }
 
 /// O que `save_settings` precisa fazer ao trocar `current` por `next`.
