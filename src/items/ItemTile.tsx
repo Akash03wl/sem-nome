@@ -11,11 +11,11 @@ export interface ItemTileProps {
   size?: "big" | "row";
   /** Texto à direita no modo "row" (ex.: "Pasta"). */
   detail?: string;
-  draggable?: boolean;
+  /** Alvo para o arrastar interno (atributo `data-drop`). */
+  dropId?: string;
   onOpen(): void;
   onContext(pos: { x: number; y: number }): void;
-  onDragStart?(e: React.DragEvent): void;
-  onDrop?(e: React.DragEvent): void;
+  onPointerDown?(e: React.PointerEvent): void;
 }
 
 const PALETTE = ["#3b7ddd", "#5865c9", "#1e9e55", "#c9414b", "#b8862a", "#1f6fb5", "#8c4fc9", "#d0513a"];
@@ -26,7 +26,7 @@ export function tileColor(id: string): string {
   return PALETTE[Math.abs(h) % PALETTE.length];
 }
 
-export function ItemTile({ item, iconSrc, badge, size = "big", detail, draggable, onOpen, onContext, onDragStart, onDrop }: ItemTileProps) {
+export function ItemTile({ item, iconSrc, badge, size = "big", detail, dropId, onOpen, onContext, onPointerDown }: ItemTileProps) {
   function context(e: MouseEvent) {
     e.preventDefault();
     onContext({ x: e.clientX, y: e.clientY });
@@ -45,10 +45,8 @@ export function ItemTile({ item, iconSrc, badge, size = "big", detail, draggable
       onClick={onOpen}
       onContextMenu={context}
       onKeyDown={keyDown}
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragOver={onDrop ? (e) => e.preventDefault() : undefined}
-      onDrop={onDrop}
+      data-drop={dropId}
+      onPointerDown={onPointerDown}
       title={item.name}
     >
       {iconSrc ? (

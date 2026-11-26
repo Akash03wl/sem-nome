@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { ACCENTS, ACCENT_NAMES, type Settings } from "../lib/types";
 import { formatHotkey } from "../quick/QuickLauncher";
 import "./Panel.css";
@@ -12,9 +12,11 @@ export interface PanelProps {
   initialSection?: Section;
   /** Devolve `null` se salvou, ou a mensagem de erro do backend. */
   onSave(next: Settings): Promise<string | null>;
+  /** Conteúdo da seção "Itens" (a `ItemsSection`, montada pelo app). */
+  itemsSection?: ReactNode;
 }
 
-export function Panel({ settings, hotkeyError, initialSection, onSave }: PanelProps) {
+export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSection }: PanelProps) {
   const [section, setSection] = useState<Section>(initialSection ?? (hotkeyError ? "config" : "itens"));
   const [current, setCurrent] = useState(settings);
   const [draft, setDraft] = useState(settings.hotkey);
@@ -69,9 +71,9 @@ export function Panel({ settings, hotkeyError, initialSection, onSave }: PanelPr
 
       <main className="panel-main">
         {section === "itens" && (
-          <section>
+          <section className="panel-items">
             <h1>Itens</h1>
-            <p className="panel-empty">Em breve: seus programas e categorias aparecem aqui.</p>
+            {itemsSection ?? <p className="panel-empty">Em breve: seus programas e categorias aparecem aqui.</p>}
           </section>
         )}
 
