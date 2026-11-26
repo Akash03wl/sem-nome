@@ -1,4 +1,5 @@
 mod commands;
+mod files_cmds;
 mod library_cmds;
 mod win;
 mod shortcut;
@@ -27,6 +28,8 @@ pub struct AppState {
     /// Apps do Menu Iniciar e da Store (preenchido em segundo plano).
     pub discovered: Mutex<Vec<win::Discovered>>,
     pub icon_dir: PathBuf,
+    /// DLL do Everything (busca de arquivos); `None` se não veio no instalador.
+    pub everything: Mutex<Option<win::everything::Everything>>,
 }
 
 pub fn run() {
@@ -57,6 +60,12 @@ pub fn run() {
             library_cmds::add_site,
             library_cmds::open_url,
             library_cmds::run_system_command,
+            files_cmds::search_files,
+            files_cmds::everything_status,
+            files_cmds::everything_start,
+            files_cmds::everything_install,
+            files_cmds::open_path,
+            files_cmds::reveal_path,
             commands::get_settings,
             commands::save_settings,
             commands::hide_quick,
@@ -90,6 +99,12 @@ pub fn run() {
                 library_path,
                 discovered: Mutex::new(Vec::new()),
                 icon_dir: app.path().local_data_dir()?.join("Vitra").join("icons"),
+                everything: Mutex::new(
+                    app.path()
+                        .resource_dir()
+                        .ok()
+                        .and_then(|dir| win::everything::Everything::load(&dir.join("Everything64.dll"))),
+                ),
             });
             library_cmds::spawn_discovery(app.handle().clone());
 

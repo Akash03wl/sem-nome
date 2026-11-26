@@ -20,6 +20,8 @@ mod icons;
 #[cfg(windows)]
 mod launch;
 #[cfg(windows)]
+pub mod everything;
+#[cfg(windows)]
 mod system;
 
 #[cfg(windows)]
@@ -55,3 +57,34 @@ mod fallback {
 
 #[cfg(not(windows))]
 pub use fallback::{discover, icon_png, open, reveal, run_system};
+
+/// Fora do Windows não existe Everything: tudo responde "não disponível".
+#[cfg(not(windows))]
+pub mod everything {
+    use std::path::Path;
+    use vitra_core::files::FileHit;
+
+    pub struct Everything;
+
+    impl Everything {
+        pub fn load(_dll_path: &Path) -> Option<Everything> {
+            None
+        }
+        pub fn probe(&self) -> Option<u32> {
+            None
+        }
+        pub fn search(&self, _text: &str, _max: u32) -> Result<Vec<FileHit>, u32> {
+            Ok(Vec::new())
+        }
+    }
+
+    pub fn installed() -> bool {
+        false
+    }
+    pub fn start() -> Result<(), String> {
+        Err("Disponível só no Windows.".into())
+    }
+    pub fn install() -> Result<(), String> {
+        Err("Disponível só no Windows.".into())
+    }
+}
