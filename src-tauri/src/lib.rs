@@ -1,4 +1,5 @@
 mod commands;
+mod win;
 mod shortcut;
 mod tray;
 mod windows;
