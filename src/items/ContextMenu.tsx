@@ -10,6 +10,7 @@ export type MenuAction =
   | { moveTo: string }
   | "removeFromCategory"
   | "rename"
+  | "editMode"
   | "remove"
   | "hide";
 
@@ -97,6 +98,7 @@ export function ContextMenu(p: ContextMenuProps) {
       )}
       {p.inCategory && entry("Tirar desta categoria", "removeFromCategory")}
       <hr className="menu-sep" />
+      {p.kind === "mode" && entry("Editar modo", "editMode")}
       {!p.fromAll && entry("Renomear", "rename")}
       {p.fromAll ? entry("Esconder da lista", "hide") : entry("Remover do Vitra", "remove", true)}
     </div>

@@ -11,6 +11,8 @@ import {
   visibleDiscovered,
   type Entry,
 } from "../items/actions";
+import { ModeForm } from "./ModeForm";
+import type { Item } from "../lib/types";
 import "./ItemsSection.css";
 
 export const FAVORITES = "favoritos";
@@ -58,6 +60,8 @@ export function ItemsSection(props: ItemsSectionProps) {
   const [addMenu, setAddMenu] = useState(false);
   const [siteForm, setSiteForm] = useState<{ name: string; url: string } | null>(null);
   const [showHidden, setShowHidden] = useState(false);
+  /** `null` = fechado; `"new"` = novo modo; senão, o modo sendo editado. */
+  const [modeForm, setModeForm] = useState<"new" | Item | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; entry: Entry } | null>(null);
   // Arrastar interno feito com eventos de ponteiro: no Windows o HTML5 drag-and-drop
   // fica desligado enquanto a janela aceita arquivos soltos do Explorer.
@@ -176,8 +180,24 @@ export function ItemsSection(props: ItemsSectionProps) {
       runMenuAction(action, menu.entry, library, props, {
         inCategory: category?.id,
         startRename: (id) => setRenamingItem({ id, name: menu.entry.item.name }),
+        editMode: (id) => setModeForm(library.items.find((i) => i.id === id) ?? null),
       }),
     );
+  }
+
+  async function saveMode(name: string, members: string[]): Promise<string | null> {
+    if (modeForm === null) return null;
+    if (modeForm === "new") {
+      const err = await onApply({ op: "createMode", name, members });
+      if (!err) setModeForm(null);
+      return err;
+    }
+    const id = modeForm.id;
+    const err =
+      (name.trim() !== modeForm.name ? await onApply({ op: "renameItem", id, name }) : null) ??
+      (await onApply({ op: "setModeMembers", id, members }));
+    if (!err) setModeForm(null);
+    return err;
   }
 
   const tiles = (entries: Entry[], reorder = false) => (
@@ -323,6 +343,16 @@ export function ItemsSection(props: ItemsSectionProps) {
                   >
                     Site
                   </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setAddMenu(false);
+                      setModeForm("new");
+                    }}
+                  >
+                    Modo (grupo de itens)
+                  </button>
                 </div>
               )}
             </div>
@@ -352,6 +382,16 @@ export function ItemsSection(props: ItemsSectionProps) {
               Cancelar
             </button>
           </form>
+        )}
+
+        {modeForm && (
+          <ModeForm
+            key={modeForm === "new" ? "new" : modeForm.id}
+            library={library}
+            initial={modeForm === "new" ? undefined : modeForm}
+            onSubmit={saveMode}
+            onCancel={() => setModeForm(null)}
+          />
         )}
 
         {renamingItem && (

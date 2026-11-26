@@ -10,7 +10,7 @@ export interface ItemHandlers {
   onReveal(id: string): Promise<string | null>;
 }
 
-export const KIND_LABEL: Record<string, string> = { app: "Programa", folder: "Pasta", file: "Arquivo", site: "Site" };
+export const KIND_LABEL: Record<string, string> = { app: "Programa", folder: "Pasta", file: "Arquivo", site: "Site", mode: "Modo" };
 
 /** Busca os itens de uma lista de ids, ignorando ids que não existem mais. */
 export function itemsByIds(library: Library, ids: string[]): Item[] {
@@ -42,7 +42,7 @@ export async function runMenuAction(
   entry: Entry,
   library: Library,
   h: ItemHandlers,
-  ctx: { inCategory?: string; startRename(id: string): void },
+  ctx: { inCategory?: string; startRename(id: string): void; editMode?(id: string): void },
 ): Promise<string | null> {
   const id = entry.item.id;
   const ensure = async () => {
@@ -61,6 +61,10 @@ export async function runMenuAction(
     return h.onApply({ op: "removeFromCategory", category: ctx.inCategory, id });
   if (action === "rename") {
     ctx.startRename(id);
+    return null;
+  }
+  if (action === "editMode") {
+    ctx.editMode?.(id);
     return null;
   }
   if (action === "remove") return h.onApply({ op: "removeItem", id });

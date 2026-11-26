@@ -80,4 +80,11 @@ describe("ContextMenu", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(p.onClose).toHaveBeenCalled();
   });
+
+  it("modo mostra Editar modo e não administrador nem local", () => {
+    setup({ kind: "mode", canReveal: false });
+    expect(names()).toContain("Editar modo");
+    expect(names()).not.toContain("Abrir como administrador");
+    expect(names()).not.toContain("Abrir local do arquivo");
+  });
 });

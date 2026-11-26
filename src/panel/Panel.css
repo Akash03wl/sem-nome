@@ -124,3 +124,22 @@
 .panel-swatch[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4) inset; }
 
 .panel-items { display: flex; flex-direction: column; min-height: 100%; }
+
+.panel-shortcuts { flex-direction: column; align-items: stretch; }
+.panel-shortcut-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.panel-shortcut-list li {
+  display: grid;
+  grid-template-columns: 56px 140px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 13px;
+}
+.panel-shortcut-list kbd { font: 600 12px var(--font-body); color: var(--accent); }
+.panel-shortcut-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
+.panel-link { border: none; background: none; color: var(--text-soft); cursor: pointer; font-size: 13px; }
+.panel-link:hover { color: #ffb3a7; }
+.panel-shortcut-form { display: grid; grid-template-columns: 80px 140px minmax(0, 1fr) auto; gap: 8px; }
+.panel-shortcut-form input { width: 100% !important; }

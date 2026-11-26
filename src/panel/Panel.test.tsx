@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Panel } from "./Panel";
 import type { Settings } from "../lib/types";
 
-const base: Settings = { version: 1, hotkey: "Alt+Space", accent: "#9b82ff", autostart: true, webShortcuts: [] };
+const base: Settings = { version: 1, hotkey: "Alt+Space", accent: "#9b82ff", autostart: true, webShortcuts: [{ keyword: "yt", name: "YouTube", url: "https://www.youtube.com/results?search_query={q}" }] };
 
 function setup(over: Partial<Parameters<typeof Panel>[0]> = {}) {
   const props = {
@@ -63,5 +63,32 @@ describe("Panel", () => {
     await userEvent.click(orange);
     expect(props.onSave).toHaveBeenCalledWith({ ...base, accent: "#ff8a4c" });
     expect(orange).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("adiciona palavra-chave", async () => {
+    const props = setup({ initialSection: "config" });
+    await userEvent.type(screen.getByLabelText("Palavra-chave"), "gh");
+    await userEvent.type(screen.getByLabelText("Nome do site"), "GitHub");
+    await userEvent.type(screen.getByLabelText("Endereço de pesquisa"), "github.com/search?q={{q}");
+    await userEvent.click(screen.getByRole("button", { name: "Adicionar palavra-chave" }));
+    expect(props.onSave).toHaveBeenCalledWith({
+      ...base,
+      webShortcuts: [...base.webShortcuts, { keyword: "gh", name: "GitHub", url: "github.com/search?q={q}" }],
+    });
+  });
+
+  it("remove palavra-chave", async () => {
+    const props = setup({ initialSection: "config" });
+    await userEvent.click(screen.getByRole("button", { name: "Remover yt" }));
+    expect(props.onSave).toHaveBeenCalledWith({ ...base, webShortcuts: [] });
+  });
+
+  it("mostra erro de palavra-chave", async () => {
+    setup({ initialSection: "config", onSave: vi.fn(async () => "Essa palavra-chave já existe.") });
+    await userEvent.type(screen.getByLabelText("Palavra-chave"), "yt");
+    await userEvent.type(screen.getByLabelText("Nome do site"), "X");
+    await userEvent.type(screen.getByLabelText("Endereço de pesquisa"), "x.com?q={{q}");
+    await userEvent.click(screen.getByRole("button", { name: "Adicionar palavra-chave" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Essa palavra-chave já existe.");
   });
 });

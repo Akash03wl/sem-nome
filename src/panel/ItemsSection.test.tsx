@@ -146,3 +146,15 @@ describe("ItemsSection arrastar", () => {
     expect(p.onApply).not.toHaveBeenCalled();
   });
 });
+
+describe("ItemsSection modos", () => {
+  it("Adicionar > Modo abre o formulário e cria", async () => {
+    const p = setup();
+    await userEvent.click(screen.getByRole("button", { name: /Adicionar/ }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Modo (grupo de itens)" }));
+    await userEvent.type(screen.getByLabelText("Nome do modo"), "Estudo");
+    await userEvent.click(screen.getByRole("checkbox", { name: "Alpha" }));
+    await userEvent.click(screen.getByRole("button", { name: "Salvar modo" }));
+    expect(p.onApply).toHaveBeenCalledWith({ op: "createMode", name: "Estudo", members: ["a"] });
+  });
+});

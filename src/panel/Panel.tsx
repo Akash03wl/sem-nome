@@ -22,6 +22,7 @@ export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSect
   const [draft, setDraft] = useState(settings.hotkey);
   const [error, setError] = useState<string | null>(hotkeyError);
   const [saved, setSaved] = useState<string | null>(null);
+  const [newShortcut, setNewShortcut] = useState({ keyword: "", name: "", url: "" });
 
   useEffect(() => {
     setCurrent(settings);
@@ -47,6 +48,14 @@ export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSect
       setError(null);
       setSaved(okMessage);
     }
+    return err;
+  }
+
+  async function addShortcut(e: FormEvent) {
+    e.preventDefault();
+    const list = [...(current.webShortcuts ?? []), newShortcut];
+    const err = await apply({ ...current, webShortcuts: list }, "Palavra-chave salva.");
+    if (!err) setNewShortcut({ keyword: "", name: "", url: "" });
   }
 
   async function saveHotkey(e: FormEvent) {
@@ -139,6 +148,45 @@ export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSect
                   />
                 ))}
               </div>
+            </div>
+
+            <div className="panel-row panel-shortcuts">
+              <div className="panel-row-text">
+                <span>Palavras-chave de pesquisa</span>
+                <span className="panel-hint">Na busca, digite a palavra-chave, espaço e o que quer pesquisar. Ex.: yt lofi</span>
+              </div>
+              <ul className="panel-shortcut-list">
+                {(current.webShortcuts ?? []).map((s) => (
+                  <li key={s.keyword}>
+                    <kbd>{s.keyword}</kbd>
+                    <span className="panel-shortcut-name">{s.name}</span>
+                    <span className="panel-shortcut-url">{s.url}</span>
+                    <button
+                      type="button"
+                      className="panel-link"
+                      aria-label={`Remover ${s.keyword}`}
+                      onClick={() =>
+                        apply({ ...current, webShortcuts: current.webShortcuts.filter((x) => x.keyword !== s.keyword) }, "Palavra-chave removida.")
+                      }
+                    >
+                      Remover
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <form className="panel-shortcut-form" onSubmit={addShortcut}>
+                <input aria-label="Palavra-chave" placeholder="gh" value={newShortcut.keyword} onChange={(e) => setNewShortcut({ ...newShortcut, keyword: e.target.value })} />
+                <input aria-label="Nome do site" placeholder="GitHub" value={newShortcut.name} onChange={(e) => setNewShortcut({ ...newShortcut, name: e.target.value })} />
+                <input
+                  aria-label="Endereço de pesquisa"
+                  placeholder="github.com/search?q={q}"
+                  value={newShortcut.url}
+                  onChange={(e) => setNewShortcut({ ...newShortcut, url: e.target.value })}
+                />
+                <button type="submit" className="panel-btn">
+                  Adicionar palavra-chave
+                </button>
+              </form>
             </div>
           </section>
         )}

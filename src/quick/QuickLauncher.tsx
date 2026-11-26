@@ -219,6 +219,7 @@ export function QuickLauncher(props: QuickLauncherProps) {
     const err = await runMenuAction(action, menu.entry, library, props, {
       inCategory: category?.id,
       startRename: (id) => setRenaming({ id, name: menu.entry.item.name }),
+      editMode: () => onOpenPanel(),
     });
     setError(err);
   }
