@@ -4,7 +4,9 @@ use std::path::Path;
 
 use base64::Engine;
 use tauri::{AppHandle, Emitter, Manager, State};
-use vitra_core::items::{classify_path, display_name, item_id, normalize_url, site_name};
+use vitra_core::items::{
+    classify_path, display_name, item_id, launch_error_message, local_path, normalize_url, site_name,
+};
 use vitra_core::library::{save_library, Item, ItemKind, LibOp, Library};
 
 use crate::win::{self, Discovered};
@@ -49,6 +51,14 @@ fn find(state: &AppState, id: &str) -> Option<Item> {
         args: String::new(),
         admin: false,
     })
+}
+
+/// Confere se um caminho local ainda existe, com a mesma mensagem de "não encontrado".
+fn ensure_exists(target: &str) -> Result<(), String> {
+    match local_path(target) {
+        Some(p) if !Path::new(p).exists() => Err(launch_error_message(2).unwrap_or_default()),
+        _ => Ok(()),
+    }
 }
 
 /// Coloca `id` em favoritos (`"favoritos"`) ou numa categoria.
@@ -101,8 +111,13 @@ pub async fn launch_item(
     id: String,
     admin: bool,
 ) -> Result<(), String> {
-    let item = find(&state, &id).ok_or("Não encontrei este item. Ele foi movido ou apagado?")?;
-    win::open(&item.target, &item.args, admin || item.admin)?;
+    let item = find(&state, &id).ok_or_else(|| launch_error_message(2).unwrap_or_default())?;
+    ensure_exists(&item.target)?;
+    // Abrir pode esperar o UAC ou um caminho de rede lento: fora das threads assíncronas.
+    let (target, args, elevated) = (item.target.clone(), item.args.clone(), admin || item.admin);
+    tauri::async_runtime::spawn_blocking(move || win::open(&target, &args, elevated))
+        .await
+        .map_err(|_| "Não consegui abrir este item.".to_string())??;
     mutate(&app, &state, |lib| {
         if lib.item(&item.id).is_none() {
             apply(lib, LibOp::AddItem { item: item.clone() })?;
@@ -114,10 +129,11 @@ pub async fn launch_item(
 
 #[tauri::command]
 pub fn reveal_item(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    let item = find(&state, &id).ok_or("Não encontrei este item. Ele foi movido ou apagado?")?;
+    let item = find(&state, &id).ok_or_else(|| launch_error_message(2).unwrap_or_default())?;
     if item.kind == ItemKind::Site || item.target.to_lowercase().starts_with("shell:appsfolder") {
         return Err("Não dá para abrir o local deste app.".into());
     }
+    ensure_exists(&item.target)?;
     win::reveal(&item.target)
 }
 
@@ -132,7 +148,12 @@ pub async fn get_icon(state: State<'_, AppState>, id: String) -> Result<Option<S
     let bytes = match std::fs::read(&cache) {
         Ok(b) => Some(b),
         Err(_) => {
-            let fresh = win::icon_png(&item.target, ICON_SIZE);
+            // Extrair ícones usa COM/GDI e pode ser lento: fora das threads assíncronas.
+            let target = item.target.clone();
+            let fresh = tauri::async_runtime::spawn_blocking(move || win::icon_png(&target, ICON_SIZE))
+                .await
+                .ok()
+                .flatten();
             if let Some(b) = &fresh {
                 let _ = std::fs::create_dir_all(&state.icon_dir);
                 let _ = std::fs::write(&cache, b);

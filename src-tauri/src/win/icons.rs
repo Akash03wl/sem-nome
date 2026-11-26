@@ -53,9 +53,8 @@ unsafe fn bitmap_rgba(bitmap: HBITMAP) -> Option<(u32, u32, Vec<u8>)> {
     if lines == 0 {
         return None;
     }
-    for px in pixels.chunks_exact_mut(4) {
-        px.swap(0, 2); // BGRA → RGBA
-    }
+    // O Windows entrega BGRA com alfa pré-multiplicado; o PNG quer RGBA normal.
+    vitra_core::items::bgra_premultiplied_to_rgba(&mut pixels);
     Some((w as u32, h as u32, pixels))
 }
 

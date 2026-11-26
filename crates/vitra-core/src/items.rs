@@ -154,6 +154,36 @@ pub fn launch_error_message(code: isize) -> Option<String> {
     Some(msg.into())
 }
 
+/// Caminho local a conferir antes de abrir; `None` para `shell:…` e endereços web.
+pub fn local_path(target: &str) -> Option<&str> {
+    let lower = target.to_ascii_lowercase();
+    if lower.starts_with("shell:") || lower.contains("://") {
+        None
+    } else {
+        Some(target)
+    }
+}
+
+/// Converte pixels BGRA pré-multiplicados (como o Windows entrega) para RGBA normal.
+/// Ícones antigos sem transparência (alfa todo 0) ficam opacos.
+pub fn bgra_premultiplied_to_rgba(pixels: &mut [u8]) {
+    let no_alpha = pixels.chunks_exact(4).all(|px| px[3] == 0);
+    for px in pixels.chunks_exact_mut(4) {
+        px.swap(0, 2); // BGRA → RGBA
+        if no_alpha {
+            px[3] = 255;
+            continue;
+        }
+        let a = px[3] as u32;
+        if a == 0 || a == 255 {
+            continue;
+        }
+        for c in &mut px[..3] {
+            *c = ((*c as u32 * 255 + a / 2) / a).min(255) as u8;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246,5 +276,36 @@ mod tests {
     #[test]
     fn launch_success_is_none() {
         assert_eq!(launch_error_message(42), None);
+    }
+
+    #[test]
+    fn local_path_only_for_real_paths() {
+        assert_eq!(local_path("C:\\Games\\Steam.lnk"), Some("C:\\Games\\Steam.lnk"));
+        assert_eq!(local_path("\\\\servidor\\pasta"), Some("\\\\servidor\\pasta"));
+        assert_eq!(local_path("shell:AppsFolder\\Microsoft.Edge"), None);
+        assert_eq!(local_path("https://youtube.com"), None);
+        assert_eq!(local_path("http://localhost:3000"), None);
+    }
+
+    #[test]
+    fn premultiplied_pixels_are_unpremultiplied() {
+        // BGRA: azul 64, verde 32, vermelho 16, alfa 128 (50%) → RGBA 32, 64, 128, 128
+        let mut px = vec![64, 32, 16, 128];
+        bgra_premultiplied_to_rgba(&mut px);
+        assert_eq!(px, vec![32, 64, 128, 128]);
+    }
+
+    #[test]
+    fn opaque_and_transparent_pixels() {
+        let mut px = vec![10, 20, 30, 255, 0, 0, 0, 0];
+        bgra_premultiplied_to_rgba(&mut px);
+        assert_eq!(px, vec![30, 20, 10, 255, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn icons_without_alpha_become_opaque() {
+        let mut px = vec![10, 20, 30, 0, 40, 50, 60, 0];
+        bgra_premultiplied_to_rgba(&mut px);
+        assert_eq!(px, vec![30, 20, 10, 255, 60, 50, 40, 255]);
     }
 }
