@@ -1,4 +1,12 @@
-import { SYSTEM_COMMANDS, type Discovered, type Library, type SystemCommand, type WebShortcut } from "../lib/types";
+import {
+  SYSTEM_COMMANDS,
+  type Discovered,
+  type EverythingStatus,
+  type FileHit,
+  type Library,
+  type SystemCommand,
+  type WebShortcut,
+} from "../lib/types";
 import type { Entry } from "../items/actions";
 import { calculate, formatNumber } from "./calc";
 import { score } from "./fuzzy";
@@ -8,7 +16,9 @@ export type SearchResult =
   | { type: "calc"; id: "calc"; value: number; text: string }
   | { type: "web"; id: string; title: string; url: string }
   | { type: "item"; id: string; entry: Entry; score: number }
-  | { type: "command"; id: string; command: SystemCommand; label: string };
+  | { type: "command"; id: string; command: SystemCommand; label: string }
+  | { type: "file"; id: string; hit: FileHit }
+  | { type: "fileStatus"; id: "files-status"; status: Exclude<EverythingStatus, "ready"> };
 
 export interface SearchContext {
   library: Library;

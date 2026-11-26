@@ -64,6 +64,10 @@ function QuickApp() {
       onSystem={api.runSystemCommand}
       onOpenUrl={api.openUrl}
       onCopy={api.copyText}
+      onSearchFiles={api.searchFiles}
+      onOpenPath={api.openPath}
+      onRevealPath={api.revealPath}
+      onEverythingFix={api.fixEverything}
     />
   );
 }

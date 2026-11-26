@@ -2,7 +2,7 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { QuickLauncher, formatHotkey } from "./QuickLauncher";
-import type { Discovered, Library } from "../lib/types";
+import type { Discovered, EverythingStatus, FileHit, Library } from "../lib/types";
 
 const item = (id: string, name: string) => ({ id, name, kind: "app" as const, target: `C:\\${name}.exe`, args: "", admin: false });
 
@@ -38,6 +38,10 @@ function setup(over: Partial<Parameters<typeof QuickLauncher>[0]> = {}) {
     onSystem: vi.fn(async () => null as string | null),
     onOpenUrl: vi.fn(async () => null as string | null),
     onCopy: vi.fn(async () => {}),
+    onSearchFiles: vi.fn(async (_q: string) => [] as FileHit[] | EverythingStatus),
+    onOpenPath: vi.fn(async () => null as string | null),
+    onRevealPath: vi.fn(async () => null as string | null),
+    onEverythingFix: vi.fn(async () => null as string | null),
     ...over,
   };
   const utils = render(<QuickLauncher {...props} />);
@@ -301,5 +305,47 @@ describe("QuickLauncher comandos do PC", () => {
     const { props } = setup();
     await userEvent.click(screen.getByRole("button", { name: "Bloquear" }));
     expect(props.onSystem).toHaveBeenCalledWith("lock");
+  });
+});
+
+describe("QuickLauncher arquivos", () => {
+  const report: FileHit = { name: "relatorio.pdf", path: "C:\\Docs\\relatorio.pdf", isDir: false };
+  const typeQuery = async (text: string) => {
+    await userEvent.type(screen.getByPlaceholderText("Buscar programas, pastas, sites…"), text);
+  };
+
+  it("mostra arquivos depois dos comandos", async () => {
+    setup({ onSearchFiles: vi.fn(async () => [report]) });
+    await typeQuery("re");
+    const list = screen.getByRole("listbox", { name: "Resultados" });
+    expect(await screen.findByText("relatorio.pdf")).toBeInTheDocument();
+    const text = list.textContent ?? "";
+    expect(text.indexOf("Comandos do PC")).toBeLessThan(text.indexOf("Arquivos"));
+  });
+
+  it("Enter abre arquivo e Shift+Enter abre o local", async () => {
+    const { props } = setup({ onSearchFiles: vi.fn(async () => [report]) });
+    await typeQuery("relatorio");
+    await screen.findByText("relatorio.pdf");
+    await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(props.onRevealPath).toHaveBeenCalledWith("C:\\Docs\\relatorio.pdf");
+    await userEvent.keyboard("{Enter}");
+    expect(props.onOpenPath).toHaveBeenCalledWith("C:\\Docs\\relatorio.pdf", false);
+    await vi.waitFor(() => expect(props.onHide).toHaveBeenCalled());
+  });
+
+  it("mostra aviso quando o Everything está fechado", async () => {
+    const { props } = setup({ onSearchFiles: vi.fn(async () => "notRunning" as const) });
+    await typeQuery("relatorio");
+    expect(await screen.findByText("O Everything está fechado.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Abrir Everything/ }));
+    expect(props.onEverythingFix).toHaveBeenCalledWith("notRunning");
+  });
+
+  it("não busca arquivos para contas", async () => {
+    const { props } = setup();
+    await typeQuery("2+2");
+    await new Promise((r) => setTimeout(r, 250));
+    expect(props.onSearchFiles).not.toHaveBeenCalled();
   });
 });

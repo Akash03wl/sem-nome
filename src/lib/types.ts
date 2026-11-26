@@ -111,3 +111,18 @@ export function adopt(d: Discovered): Item {
 export function canReveal(item: { kind?: ItemKind; target: string }): boolean {
   return item.kind !== "site" && item.kind !== "mode" && !item.target.toLowerCase().startsWith("shell:appsfolder");
 }
+
+/** Espelho de `vitra_core::files::FileHit`. */
+export interface FileHit {
+  name: string;
+  path: string;
+  isDir: boolean;
+}
+
+export type EverythingStatus = "ready" | "notRunning" | "notInstalled" | "dllMissing";
+
+export const EVERYTHING_MESSAGE: Record<Exclude<EverythingStatus, "ready">, { text: string; action: string | null }> = {
+  notRunning: { text: "O Everything está fechado.", action: "Abrir Everything" },
+  notInstalled: { text: "Instale o Everything para buscar arquivos do PC.", action: "Instalar Everything" },
+  dllMissing: { text: "DLL do Everything não encontrada.", action: null },
+};

@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { Discovered, LibOp, Library, Settings, SystemCommand } from "./types";
+import type { Discovered, EverythingStatus, FileHit, LibOp, Library, Settings, SystemCommand } from "./types";
 
 export const getSettings = () => invoke<Settings>("get_settings");
 
@@ -89,4 +89,30 @@ export async function copyText(text: string): Promise<void> {
   } catch {
     // Área de transferência indisponível: nada a fazer além de não travar.
   }
+}
+
+// ---- Arquivos (Fase 4) ----
+
+/** Arquivos do PC pelo Everything, ou o motivo de não poder buscar. */
+export async function searchFiles(query: string): Promise<FileHit[] | EverythingStatus> {
+  try {
+    return await invoke<FileHit[]>("search_files", { query });
+  } catch (err) {
+    return typeof err === "string" ? (err as EverythingStatus) : "notRunning";
+  }
+}
+
+export const everythingStatus = () => invoke<EverythingStatus>("everything_status").catch(() => "notRunning" as const);
+
+export const openPath = (path: string, admin: boolean) =>
+  attempt(() => invoke("open_path", { path, admin }), "Não consegui abrir este item.");
+
+export const revealPath = (path: string) =>
+  attempt(() => invoke("reveal_path", { path }), "Não consegui abrir o local do arquivo.");
+
+/** Abre o Everything (se está fechado) ou instala (se falta). */
+export async function fixEverything(status: EverythingStatus): Promise<string | null> {
+  if (status === "notRunning") return attempt(() => invoke("everything_start"), "Não consegui abrir o Everything.");
+  if (status === "notInstalled") return attempt(() => invoke("everything_install"), "Não consegui instalar o Everything.");
+  return null;
 }

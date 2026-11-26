@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
-import { SYSTEM_COMMANDS, type Discovered, type LibOp, type Library, type SystemCommand, type WebShortcut } from "../lib/types";
+import {
+  EVERYTHING_MESSAGE,
+  SYSTEM_COMMANDS,
+  type Discovered,
+  type EverythingStatus,
+  type FileHit,
+  type LibOp,
+  type Library,
+  type SystemCommand,
+  type WebShortcut,
+} from "../lib/types";
+import { fileSearchEnabled, useFileSearch } from "../search/useFileSearch";
 import { useIcon } from "../lib/useIcon";
 import { ItemTile } from "../items/ItemTile";
 import { ContextMenu, type MenuAction } from "../items/ContextMenu";
@@ -33,6 +44,12 @@ export interface QuickLauncherProps {
   onSystem(cmd: SystemCommand): Promise<string | null>;
   onOpenUrl(url: string): Promise<string | null>;
   onCopy(text: string): Promise<void>;
+  /** Arquivos do PC (Everything), ou o motivo de não poder buscar. */
+  onSearchFiles(query: string): Promise<FileHit[] | EverythingStatus>;
+  onOpenPath(path: string, admin: boolean): Promise<string | null>;
+  onRevealPath(path: string): Promise<string | null>;
+  /** Abre ou instala o Everything, conforme o status. */
+  onEverythingFix(status: EverythingStatus): Promise<string | null>;
 }
 
 const KEY_NAMES: Record<string, string> = { Space: "Espaço", Super: "Win", Esc: "Esc" };
@@ -53,7 +70,12 @@ const GROUP_TITLE: Record<SearchResult["type"], string> = {
   web: "Internet",
   item: "Itens",
   command: "Comandos do PC",
+  file: "Arquivos",
+  fileStatus: "Arquivos",
 };
+
+/** "C:\\Docs\\a.pdf" → "C:\\Docs" */
+const parentDir = (path: string) => path.replace(/[\\/][^\\/]*$/, "") || path;
 
 /** "Desligar" → "desligar"; usado em "Clique de novo para desligar". */
 const lower = (label: string) => label.charAt(0).toLowerCase() + label.slice(1);
@@ -98,10 +120,17 @@ export function QuickLauncher(props: QuickLauncherProps) {
   const favorites = itemsByIds(library, library.favorites);
   const category = library.categories.find((c) => c.id === section);
   const allApps = visibleDiscovered(library, discovered);
-  const results = useMemo(
+  const baseResults = useMemo(
     () => search(query, { library, discovered, shortcuts: props.shortcuts }),
     [query, library, discovered, props.shortcuts],
   );
+  const files = useFileSearch(query, fileSearchEnabled(query, props.shortcuts), props.onSearchFiles);
+  const results = useMemo<SearchResult[]>(() => {
+    if (files.status && files.status !== "ready") {
+      return [...baseResults, { type: "fileStatus", id: "files-status", status: files.status }];
+    }
+    return [...baseResults, ...files.hits.map((hit) => ({ type: "file" as const, id: `file:${hit.path}`, hit }))];
+  }, [baseResults, files]);
   const searching = query.trim() !== "";
 
   useEffect(() => {
@@ -157,6 +186,16 @@ export function QuickLauncher(props: QuickLauncherProps) {
     } else if (r.type === "item") {
       if (mods.shift) setError(await props.onReveal(r.id));
       else await open(r.id, mods.ctrl);
+    } else if (r.type === "file") {
+      if (mods.shift) {
+        setError(await props.onRevealPath(r.hit.path));
+        return;
+      }
+      const err = await props.onOpenPath(r.hit.path, mods.ctrl);
+      if (err) setError(err);
+      else onHide();
+    } else if (r.type === "fileStatus") {
+      setError(await props.onEverythingFix(r.status));
     } else {
       await runCommand(r.command);
     }
@@ -257,6 +296,30 @@ export function QuickLauncher(props: QuickLauncherProps) {
           onOpen={() => void activate(r, mods)}
           onContext={(pos) => setMenu({ ...pos, entry: r.entry })}
         />
+      );
+    }
+    if (r.type === "file") {
+      return (
+        <button type="button" className="quick-result-btn quick-file" onClick={() => void activate(r, mods)}>
+          <span className="quick-file-icon" aria-hidden="true">
+            {r.hit.isDir ? "▣" : "▤"}
+          </span>
+          <span className="quick-result-title">{r.hit.name}</span>
+          <span className="quick-result-detail quick-file-path">{parentDir(r.hit.path)}</span>
+        </button>
+      );
+    }
+    if (r.type === "fileStatus") {
+      const info = EVERYTHING_MESSAGE[r.status];
+      return (
+        <div className="quick-result-btn quick-file-status">
+          <span className="quick-result-title">{info.text}</span>
+          {info.action && (
+            <button type="button" className="quick-inline-btn" onClick={() => void activate(r, mods)}>
+              {info.action}
+            </button>
+          )}
+        </div>
       );
     }
     let title: string;
