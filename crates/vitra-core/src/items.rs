@@ -155,6 +155,18 @@ pub fn launch_error_message(code: isize) -> Option<String> {
     Some(msg.into())
 }
 
+/// Resumo de abrir um modo com `total` itens, dos quais `failed` não abriram.
+pub fn mode_launch_message(total: usize, failed: &[String]) -> Option<String> {
+    if total == 0 {
+        return Some("Este modo não tem itens.".into());
+    }
+    match failed.len() {
+        0 => None,
+        n if n >= total => Some("Não consegui abrir nenhum item deste modo.".into()),
+        n => Some(format!("Abri {} de {total}. Não abriram: {}.", total - n, failed.join(", "))),
+    }
+}
+
 /// Caminho local a conferir antes de abrir; `None` para `shell:…` e endereços web.
 pub fn local_path(target: &str) -> Option<&str> {
     let lower = target.to_ascii_lowercase();
@@ -308,5 +320,31 @@ mod tests {
         let mut px = vec![10, 20, 30, 0, 40, 50, 60, 0];
         bgra_premultiplied_to_rgba(&mut px);
         assert_eq!(px, vec![30, 20, 10, 255, 60, 50, 40, 255]);
+    }
+
+    #[test]
+    fn mode_launch_message_empty() {
+        assert_eq!(mode_launch_message(0, &[]), Some("Este modo não tem itens.".into()));
+    }
+
+    #[test]
+    fn mode_launch_message_partial() {
+        assert_eq!(
+            mode_launch_message(3, &["Steam".into(), "Faculdade".into()]),
+            Some("Abri 1 de 3. Não abriram: Steam, Faculdade.".into())
+        );
+    }
+
+    #[test]
+    fn mode_launch_message_all_failed() {
+        assert_eq!(
+            mode_launch_message(2, &["A".into(), "B".into()]),
+            Some("Não consegui abrir nenhum item deste modo.".into())
+        );
+    }
+
+    #[test]
+    fn mode_launch_message_ok() {
+        assert_eq!(mode_launch_message(2, &[]), None);
     }
 }

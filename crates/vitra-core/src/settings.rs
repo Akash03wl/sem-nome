@@ -3,10 +3,57 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+use crate::items::normalize_url;
 use crate::store;
 
 /// Cores de destaque permitidas (roxo, verde-água, laranja, azul).
 pub const ACCENTS: [&str; 4] = ["#9b82ff", "#3fd0c9", "#ff8a4c", "#4c9dff"];
+
+/// Palavra-chave de pesquisa: `yt lofi` → YouTube com "lofi".
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct WebShortcut {
+    pub keyword: String,
+    pub name: String,
+    /// Endereço com `{q}` onde entra a pesquisa.
+    pub url: String,
+}
+
+fn shortcut(keyword: &str, name: &str, url: &str) -> WebShortcut {
+    WebShortcut { keyword: keyword.into(), name: name.into(), url: url.into() }
+}
+
+pub fn default_shortcuts() -> Vec<WebShortcut> {
+    vec![
+        shortcut("g", "Google", "https://www.google.com/search?q={q}"),
+        shortcut("yt", "YouTube", "https://www.youtube.com/results?search_query={q}"),
+        shortcut("w", "Wikipédia", "https://pt.wikipedia.org/w/index.php?search={q}"),
+        shortcut("m", "Google Maps", "https://www.google.com/maps/search/{q}"),
+    ]
+}
+
+/// Valida uma palavra-chave nova contra as que já existem (`others`).
+pub fn validate_shortcut(s: &WebShortcut, others: &[WebShortcut]) -> Result<WebShortcut, String> {
+    let keyword = s.keyword.trim().to_lowercase();
+    if keyword.is_empty() || keyword.chars().count() > 10 || !keyword.chars().all(char::is_alphanumeric) {
+        return Err("Use de 1 a 10 letras ou números, sem espaço.".into());
+    }
+    let name = s.name.trim();
+    if name.is_empty() {
+        return Err("Dê um nome.".into());
+    }
+    if others.iter().any(|o| o.keyword.eq_ignore_ascii_case(&keyword)) {
+        return Err("Essa palavra-chave já existe.".into());
+    }
+    if !s.url.contains("{q}") {
+        return Err("O endereço precisa ter {q} onde entra a pesquisa.".into());
+    }
+    const MARK: &str = "vitraq0";
+    let url = normalize_url(&s.url.replace("{q}", MARK))
+        .map_err(|e| e.to_string())?
+        .replace(MARK, "{q}");
+    Ok(WebShortcut { keyword, name: name.to_string(), url })
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
@@ -15,6 +62,7 @@ pub struct Settings {
     pub hotkey: String,
     pub accent: String,
     pub autostart: bool,
+    pub web_shortcuts: Vec<WebShortcut>,
 }
 
 impl Default for Settings {
@@ -24,6 +72,7 @@ impl Default for Settings {
             hotkey: "Alt+Space".into(),
             accent: ACCENTS[0].into(),
             autostart: true,
+            web_shortcuts: default_shortcuts(),
         }
     }
 }
@@ -76,6 +125,7 @@ mod tests {
             hotkey: "Ctrl+Space".into(),
             accent: "#3fd0c9".into(),
             autostart: false,
+            web_shortcuts: default_shortcuts(),
         }
     }
 
@@ -185,5 +235,60 @@ mod tests {
         let cur = Settings::default();
         let next = Settings { autostart: false, ..cur.clone() };
         assert_eq!(plan_save(&cur, &next, false).autostart, Some(false));
+    }
+
+    fn sc(k: &str, n: &str, u: &str) -> WebShortcut {
+        WebShortcut { keyword: k.into(), name: n.into(), url: u.into() }
+    }
+
+    #[test]
+    fn settings_default_has_web_shortcuts() {
+        let kws: Vec<String> = Settings::default().web_shortcuts.into_iter().map(|s| s.keyword).collect();
+        assert_eq!(kws, vec!["g", "yt", "w", "m"]);
+    }
+
+    #[test]
+    fn old_settings_get_default_shortcuts() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        fs::write(&p, r##"{"version":1,"hotkey":"Ctrl+K","accent":"#9b82ff","autostart":true}"##).unwrap();
+        let s = load(&p);
+        assert_eq!(s.hotkey, "Ctrl+K");
+        assert_eq!(s.web_shortcuts, default_shortcuts());
+    }
+
+    #[test]
+    fn validate_shortcut_accepts_and_normalizes() {
+        let ok = validate_shortcut(&sc(" GH ", " GitHub ", "github.com/search?q={q}"), &default_shortcuts());
+        assert_eq!(ok, Ok(sc("gh", "GitHub", "https://github.com/search?q={q}")));
+    }
+
+    #[test]
+    fn validate_shortcut_rejects_bad_keyword() {
+        let msg = Err("Use de 1 a 10 letras ou números, sem espaço.".to_string());
+        assert_eq!(validate_shortcut(&sc("", "X", "a.com?q={q}"), &[]), msg);
+        assert_eq!(validate_shortcut(&sc("g h", "X", "a.com?q={q}"), &[]), msg);
+        assert_eq!(validate_shortcut(&sc("abcdefghijk", "X", "a.com?q={q}"), &[]), msg);
+        assert_eq!(validate_shortcut(&sc("g", " ", "a.com?q={q}"), &[]), Err("Dê um nome.".into()));
+    }
+
+    #[test]
+    fn validate_shortcut_rejects_duplicate() {
+        assert_eq!(
+            validate_shortcut(&sc("YT", "Outro", "a.com?q={q}"), &default_shortcuts()),
+            Err("Essa palavra-chave já existe.".into())
+        );
+    }
+
+    #[test]
+    fn validate_shortcut_rejects_url_without_q_or_bad_scheme() {
+        assert_eq!(
+            validate_shortcut(&sc("x", "X", "https://a.com"), &[]),
+            Err("O endereço precisa ter {q} onde entra a pesquisa.".into())
+        );
+        assert_eq!(
+            validate_shortcut(&sc("x", "X", "javascript:alert({q})"), &[]),
+            Err("Endereço inválido. Ex.: youtube.com".into())
+        );
     }
 }
