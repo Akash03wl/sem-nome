@@ -6,6 +6,7 @@ Launcher para Windows: todos os seus programas, pastas, arquivos, sites e senhas
 - Plano da Fase 1: [docs/superpowers/plans/2026-11-26-vitra-fase-1-base.md](docs/superpowers/plans/2026-11-26-vitra-fase-1-base.md)
 - Plano da Fase 2: [docs/superpowers/plans/2026-11-26-vitra-fase-2-itens.md](docs/superpowers/plans/2026-11-26-vitra-fase-2-itens.md)
 - Plano da Fase 3: [docs/superpowers/plans/2026-11-26-vitra-fase-3-busca.md](docs/superpowers/plans/2026-11-26-vitra-fase-3-busca.md)
+- Plano da Fase 4: [docs/superpowers/plans/2026-11-26-vitra-fase-4-arquivos.md](docs/superpowers/plans/2026-11-26-vitra-fase-4-arquivos.md)
 
 ## Como instalar
 
@@ -48,6 +49,13 @@ Depois de instalado, o Vitra fica perto do relógio. Aperte **Alt+Espaço** para
 - [ ] Criar um modo (Adicionar ▾ → Modo) e abrir: os itens abrem juntos
 - [ ] Criar uma palavra-chave nova em Configurações (ex.: `gh` → `github.com/search?q={q}`)
 
+## Checklist de teste da Fase 4
+
+- [ ] Painel → Configurações → "Busca de arquivos (Everything)": se pedir, clique em **Instalar Everything** (ou **Abrir Everything**)
+- [ ] Buscar um arquivo pelo nome (ex.: `relatório`): aparece em **Arquivos**, no fim da lista
+- [ ] Enter abre o arquivo; Shift+Enter abre a pasta dele
+- [ ] Fechar o Everything e buscar de novo: aparece "O Everything está fechado." com o botão **Abrir Everything**
+
 Onde o Vitra guarda seus dados: `%APPDATA%\Vitra` (configurações e itens) e `%LOCALAPPDATA%\Vitra\icons` (ícones).
 
 ## Para desenvolver
@@ -60,6 +68,8 @@ npm test                    # testes da interface
 cargo test -p vitra-core    # testes do núcleo
 npm run tauri dev           # abre o app em modo desenvolvimento (Windows)
 ```
+
+Para a busca de arquivos funcionar em `tauri dev`, baixe o [SDK do Everything](https://www.voidtools.com/Everything-SDK.zip) e copie `dll\Everything64.dll` para `src-tauri\resources\` (o CI faz isso sozinho).
 
 Estrutura:
 

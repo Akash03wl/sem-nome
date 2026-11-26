@@ -34,6 +34,19 @@ jobs:
       - name: Testes do núcleo
         run: cargo test -p vitra-core
 
+      - name: Baixar SDK do Everything (busca de arquivos)
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP "everything-sdk.zip"
+          $dir = Join-Path $env:RUNNER_TEMP "everything-sdk"
+          Invoke-WebRequest -Uri "https://www.voidtools.com/Everything-SDK.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath $dir -Force
+          $dll = Get-ChildItem -Recurse $dir -Filter "Everything64.dll" | Select-Object -First 1
+          if (-not $dll) { throw "Everything64.dll não encontrada no SDK" }
+          New-Item -ItemType Directory -Force "src-tauri\resources" | Out-Null
+          Copy-Item $dll.FullName "src-tauri\resources\Everything64.dll"
+          Get-Item "src-tauri\resources\Everything64.dll" | Format-List Name, Length
+
       - name: Gerar instalador
         uses: tauri-apps/tauri-action@v0
         env:
