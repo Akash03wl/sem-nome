@@ -175,15 +175,19 @@ export function QuickLauncher(props: QuickLauncherProps) {
         return;
       }
       const ks = keyState.current;
-      if (ks.searching && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      // Setas e Enter só valem na caixa de busca (não no campo de renomear, no menu ou num botão),
+      // e nunca durante a composição de acentos (IME).
+      const inSearch = e.target === inputRef.current && !e.isComposing;
+      if (inSearch && ks.searching && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
         e.preventDefault();
         const n = ks.results.length;
         if (n) setSelected((i) => (e.key === "ArrowDown" ? (i + 1) % n : (i - 1 + n) % n));
         return;
       }
-      if (ks.searching && e.key === "Enter" && !e.altKey) {
+      if (inSearch && ks.searching && e.key === "Enter" && !e.altKey) {
         const r = ks.results[ks.selected];
-        if (r) {
+        // Enter segurado se repete: nunca vale como confirmação.
+        if (r && !e.repeat) {
           e.preventDefault();
           void activateRef.current(r, { ctrl: e.ctrlKey, shift: e.shiftKey });
         }

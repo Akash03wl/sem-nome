@@ -3,6 +3,11 @@
 type Token = { t: "num"; v: number } | { t: "op"; v: string };
 
 const LOOKS_LIKE_DATE = /^\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}$/;
+/** Contas reais são curtas; textos enormes (ou colados por engano) nem entram no parser. */
+const MAX_LENGTH = 200;
+/** pt-BR: "1.500" e "1.000.000,25" usam ponto como separador de milhar. */
+const GROUPED = /^\d{1,3}(?:\.\d{3})+(?:,\d+)?/;
+const PLAIN = /^\d+(?:[.,]\d+)?/;
 
 function tokenize(input: string): Token[] | null {
   const out: Token[] = [];
@@ -10,7 +15,13 @@ function tokenize(input: string): Token[] | null {
   let i = 0;
   while (i < s.length) {
     const rest = s.slice(i);
-    const num = /^\d+(?:[.,]\d+)?/.exec(rest);
+    const grouped = GROUPED.exec(rest);
+    if (grouped) {
+      out.push({ t: "num", v: Number(grouped[0].replace(/\./g, "").replace(",", ".")) });
+      i += grouped[0].length;
+      continue;
+    }
+    const num = PLAIN.exec(rest);
     if (num) {
       out.push({ t: "num", v: Number(num[0].replace(",", ".")) });
       i += num[0].length;
@@ -108,11 +119,16 @@ class Parser {
 /** Resultado da conta, ou `null` se o texto não for uma conta. */
 export function calculate(input: string): number | null {
   const s = input.trim();
-  if (!/\d/.test(s) || LOOKS_LIKE_DATE.test(s)) return null;
+  if (s.length > MAX_LENGTH || !/\d/.test(s) || LOOKS_LIKE_DATE.test(s)) return null;
   const tokens = tokenize(s);
   if (!tokens || !tokens.some((t) => t.t === "op" && t.v !== "(" && t.v !== ")")) return null;
-  const v = new Parser(tokens).parse();
-  return v !== null && Number.isFinite(v) ? v : null;
+  try {
+    const v = new Parser(tokens).parse();
+    return v !== null && Number.isFinite(v) ? v : null;
+  } catch {
+    // Qualquer falha inesperada do parser vira "não é conta", nunca derruba a busca.
+    return null;
+  }
 }
 
 const FORMAT = new Intl.NumberFormat("pt-BR", { maximumSignificantDigits: 10 });

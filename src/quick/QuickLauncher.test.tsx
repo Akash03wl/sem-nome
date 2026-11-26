@@ -227,8 +227,31 @@ describe("QuickLauncher busca", () => {
     await userEvent.keyboard("{Enter}");
     expect(props.onSystem).not.toHaveBeenCalled();
     expect(screen.getByRole("listbox", { name: "Resultados" })).toHaveTextContent("Pressione Enter de novo para desligar");
+    await new Promise((r) => setTimeout(r, 350));
     await userEvent.keyboard("{Enter}");
     expect(props.onSystem).toHaveBeenCalledWith("shutdown");
+  });
+
+  it("segurar Enter não confirma desligar", async () => {
+    const { props } = setup();
+    await typeQuery("desligar");
+    const input = screen.getByPlaceholderText("Buscar programas, pastas, sites…");
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.keyDown(input, { key: "Enter", repeat: true });
+    fireEvent.keyDown(input, { key: "Enter", repeat: true });
+    expect(props.onSystem).not.toHaveBeenCalled();
+  });
+
+  it("Enter no campo de renomear salva o nome e não abre o item", async () => {
+    const { props } = setup({ library });
+    await typeQuery("alp");
+    fireEvent.contextMenu(screen.getByRole("button", { name: /Alpha/ }), { clientX: 5, clientY: 5 });
+    await userEvent.click(screen.getByRole("menuitem", { name: "Renomear" }));
+    const field = screen.getByLabelText("Novo nome");
+    await userEvent.clear(field);
+    await userEvent.type(field, "Beta2{Enter}");
+    expect(props.onApply).toHaveBeenCalledWith({ op: "renameItem", id: "a", name: "Beta2" });
+    expect(props.onLaunch).not.toHaveBeenCalled();
   });
 
   it("nada encontrado mostra dica", async () => {
@@ -250,6 +273,23 @@ describe("QuickLauncher comandos do PC", () => {
       act(() => vi.advanceTimersByTime(3100));
       fireEvent.click(screen.getByRole("button", { name: "Desligar" }));
       expect(props.onSystem).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(400));
+      fireEvent.click(screen.getByRole("button", { name: "Clique de novo para desligar" }));
+      expect(props.onSystem).toHaveBeenCalledWith("shutdown");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clique duplo rápido não confirma desligar", () => {
+    vi.useFakeTimers();
+    try {
+      const { props } = setup();
+      fireEvent.click(screen.getByRole("button", { name: "Desligar" }));
+      act(() => vi.advanceTimersByTime(100));
+      fireEvent.click(screen.getByRole("button", { name: "Clique de novo para desligar" }));
+      expect(props.onSystem).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(400));
       fireEvent.click(screen.getByRole("button", { name: "Clique de novo para desligar" }));
       expect(props.onSystem).toHaveBeenCalledWith("shutdown");
     } finally {

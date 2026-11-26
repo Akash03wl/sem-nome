@@ -76,6 +76,19 @@ describe("calc", () => {
     }
   });
 
+  it("entradas enormes ou muito aninhadas não quebram", () => {
+    expect(calculate("(".repeat(6000) + "1+1")).toBeNull();
+    expect(calculate("-".repeat(30000) + "1")).toBeNull();
+    expect(calculate("1+".repeat(500) + "1")).toBeNull();
+  });
+
+  it("entende separador de milhar pt-BR", () => {
+    expect(calculate("1.500*2")).toBe(3000);
+    expect(calculate("1.000.000/4")).toBe(250000);
+    expect(calculate("1.500,5+0,5")).toBe(1501);
+    expect(calculate("2.5*2")).toBe(5);
+  });
+
   it("divisão por zero é null", () => {
     expect(calculate("1/0")).toBeNull();
   });
