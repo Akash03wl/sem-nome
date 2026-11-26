@@ -4,6 +4,7 @@ Launcher para Windows: todos os seus programas, pastas, arquivos, sites e senhas
 
 - Documento do projeto: [docs/superpowers/specs/2026-11-26-vitra-design.md](docs/superpowers/specs/2026-11-26-vitra-design.md)
 - Plano da Fase 1: [docs/superpowers/plans/2026-11-26-vitra-fase-1-base.md](docs/superpowers/plans/2026-11-26-vitra-fase-1-base.md)
+- Plano da Fase 2: [docs/superpowers/plans/2026-11-26-vitra-fase-2-itens.md](docs/superpowers/plans/2026-11-26-vitra-fase-2-itens.md)
 
 ## Como instalar
 
@@ -25,6 +26,19 @@ Depois de instalado, o Vitra fica perto do relógio. Aperte **Alt+Espaço** para
 - [ ] No painel, trocar o atalho e a cor de destaque funciona
 - [ ] Abrir o Vitra duas vezes não cria uma segunda cópia
 
+## Checklist de teste da Fase 2
+
+- [ ] Em **Todos** aparecem seus programas, com os ícones certos
+- [ ] Favoritar, criar categoria e mover itens entre categorias
+- [ ] Arrastar um programa, uma pasta e um arquivo do Windows para o painel
+- [ ] Adicionar um site (ex.: `youtube.com`)
+- [ ] `Alt+1…6` abre os favoritos no pop-up
+- [ ] Clique direito → "Abrir como administrador" e "Abrir local do arquivo"
+- [ ] Os **Recentes** aparecem depois de abrir alguns itens
+- [ ] Arrastar um favorito sobre outro muda a ordem
+
+Onde o Vitra guarda seus dados: `%APPDATA%\Vitra` (configurações e itens) e `%LOCALAPPDATA%\Vitra\icons` (ícones).
+
 ## Para desenvolver
 
 Requisitos: Node 22, Rust estável e (no Windows) WebView2.
@@ -38,6 +52,6 @@ npm run tauri dev           # abre o app em modo desenvolvimento (Windows)
 
 Estrutura:
 
-- `crates/vitra-core/`: lógica pura em Rust (configurações, atalhos, geometria), testável em qualquer sistema
-- `src-tauri/`: o app em si (janelas, bandeja, atalho global, início com o Windows)
+- `crates/vitra-core/`: lógica pura em Rust (configurações, biblioteca de itens, atalhos, regras de itens), testável em qualquer sistema
+- `src-tauri/`: o app em si (janelas, bandeja, atalho global, início com o Windows); `src-tauri/src/win/` tem o que só existe no Windows (apps instalados, ícones, abrir itens)
 - `src/`: a interface (React + TypeScript)
