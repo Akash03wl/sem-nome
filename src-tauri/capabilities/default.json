@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Permissões das janelas do Vitra",
   "windows": ["quick", "panel"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "dialog:default"]
 }

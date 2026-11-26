@@ -1,4 +1,5 @@
 mod commands;
+mod library_cmds;
 mod win;
 mod shortcut;
 mod tray;
@@ -10,6 +11,7 @@ use std::time::Instant;
 
 use tauri::{Manager, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
+use vitra_core::library::{load_library, Library};
 use vitra_core::settings::{self, Settings};
 
 /// Estado compartilhado do app.
@@ -20,6 +22,11 @@ pub struct AppState {
     pub hotkey_error: Mutex<Option<String>>,
     /// Quando o pop-up foi escondido por perder o foco (evita reabrir no mesmo clique da bandeja).
     pub last_blur_hide: Mutex<Option<Instant>>,
+    pub library: Mutex<Library>,
+    pub library_path: PathBuf,
+    /// Apps do Menu Iniciar e da Store (preenchido em segundo plano).
+    pub discovered: Mutex<Vec<win::Discovered>>,
+    pub icon_dir: PathBuf,
 }
 
 pub fn run() {
@@ -37,7 +44,17 @@ pub fn run() {
                 .with_handler(shortcut::handler)
                 .build(),
         )
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            library_cmds::get_library,
+            library_cmds::get_discovered,
+            library_cmds::rediscover,
+            library_cmds::library_apply,
+            library_cmds::launch_item,
+            library_cmds::reveal_item,
+            library_cmds::get_icon,
+            library_cmds::add_paths,
+            library_cmds::add_site,
             commands::get_settings,
             commands::save_settings,
             commands::hide_quick,
@@ -56,7 +73,10 @@ pub fn run() {
             _ => {}
         })
         .setup(|app| {
-            let settings_path = app.path().app_config_dir()?.join("settings.json");
+            // %APPDATA%\Vitra e %LOCALAPPDATA%\Vitra (como no documento do projeto).
+            let config_dir = app.path().config_dir()?.join("Vitra");
+            let settings_path = config_dir.join("settings.json");
+            let library_path = config_dir.join("library.json");
             let loaded = settings::load(&settings_path);
 
             app.manage(AppState {
@@ -64,7 +84,12 @@ pub fn run() {
                 settings_path,
                 hotkey_error: Mutex::new(None),
                 last_blur_hide: Mutex::new(None),
+                library: Mutex::new(load_library(&library_path)),
+                library_path,
+                discovered: Mutex::new(Vec::new()),
+                icon_dir: app.path().local_data_dir()?.join("Vitra").join("icons"),
             });
+            library_cmds::spawn_discovery(app.handle().clone());
 
             if let Some(quick) = app.get_webview_window(windows::QUICK) {
                 windows::apply_glass(&quick);
