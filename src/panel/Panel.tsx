@@ -26,6 +26,7 @@ export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSect
   const [error, setError] = useState<string | null>(hotkeyError);
   const [saved, setSaved] = useState<string | null>(null);
   const [newShortcut, setNewShortcut] = useState({ keyword: "", name: "", url: "" });
+  const [fixing, setFixing] = useState(false);
 
   useEffect(() => {
     setCurrent(settings);
@@ -169,13 +170,17 @@ export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSect
                   <button
                     type="button"
                     className="panel-btn"
+                    disabled={fixing}
                     onClick={async () => {
+                      setFixing(true);
+                      setSaved(null);
                       const err = await onEverythingFix(everythingStatus);
+                      setFixing(false);
                       setError(err);
                       if (!err) setSaved("Pronto! Pode levar alguns segundos para o Everything terminar de abrir.");
                     }}
                   >
-                    {EVERYTHING_MESSAGE[everythingStatus].action}
+                    {fixing ? (everythingStatus === "notInstalled" ? "Instalando…" : "Abrindo…") : EVERYTHING_MESSAGE[everythingStatus].action}
                   </button>
                 )}
               </div>

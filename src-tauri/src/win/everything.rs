@@ -4,8 +4,14 @@ use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use libloading::Library;
-use vitra_core::files::{file_hit, FileHit};
+use vitra_core::files::{file_hit, winget_succeeded, FileHit};
+use windows::core::HSTRING;
+use windows::Win32::System::Registry::{
+    RegGetValueW, HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ,
+};
 
 type SetSearchW = unsafe extern "system" fn(*const u16);
 type SetU32 = unsafe extern "system" fn(u32);
@@ -114,25 +120,56 @@ impl Everything {
     }
 }
 
-fn exe_candidates() -> Vec<PathBuf> {
-    ["ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"]
-        .iter()
-        .filter_map(std::env::var_os)
-        .map(|dir| PathBuf::from(dir).join("Everything").join("Everything.exe"))
-        .collect()
+/// Lê um texto do registro (`None` se não existe).
+fn reg_string(root: HKEY, key: &str, value: &str) -> Option<String> {
+    let (key, value) = (HSTRING::from(key), HSTRING::from(value));
+    let mut buf = vec![0u16; 1024];
+    let mut size = (buf.len() * 2) as u32;
+    let err = unsafe {
+        RegGetValueW(root, &key, &value, RRF_RT_REG_SZ, None, Some(buf.as_mut_ptr() as *mut _), Some(&mut size))
+    };
+    if err.is_err() {
+        return None;
+    }
+    let len = (size as usize / 2).saturating_sub(1);
+    Some(String::from_utf16_lossy(&buf[..len.min(buf.len())]))
 }
 
-/// O `Everything.exe` está instalado no lugar padrão?
+/// Onde o Everything pode estar: o que o instalador registrou, Program Files e a pasta do usuário.
+fn exe_candidates() -> Vec<PathBuf> {
+    const UNINSTALL: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Everything";
+    let mut out = Vec::new();
+    for root in [HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER] {
+        if let Some(dir) = reg_string(root, UNINSTALL, "InstallLocation") {
+            out.push(PathBuf::from(dir.trim_matches('"')).join("Everything.exe"));
+        }
+        if let Some(icon) = reg_string(root, UNINSTALL, "DisplayIcon") {
+            out.push(PathBuf::from(icon.split(',').next().unwrap_or_default().trim_matches('"')));
+        }
+    }
+    for var in ["ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"] {
+        if let Some(dir) = std::env::var_os(var) {
+            out.push(PathBuf::from(dir).join("Everything").join("Everything.exe"));
+        }
+    }
+    if let Some(dir) = std::env::var_os("LOCALAPPDATA") {
+        out.push(PathBuf::from(dir).join("Programs").join("Everything").join("Everything.exe"));
+    }
+    out
+}
+
+fn find_exe() -> Option<PathBuf> {
+    exe_candidates().into_iter().find(|p| p.is_file())
+}
+
+/// O `Everything.exe` está instalado?
 pub fn installed() -> bool {
-    exe_candidates().iter().any(|p| p.exists())
+    find_exe().is_some()
 }
 
 /// Abre o Everything em segundo plano (ícone na bandeja).
 pub fn start() -> Result<(), String> {
-    let exe = exe_candidates()
-        .into_iter()
-        .find(|p| p.exists())
-        .ok_or("Não encontrei o Everything instalado.")?;
+    let exe = find_exe().ok_or("Não encontrei o Everything instalado.")?;
     Command::new(exe)
         .arg("-startup")
         .spawn()
@@ -140,8 +177,23 @@ pub fn start() -> Result<(), String> {
         .map_err(|_| "Não consegui abrir o Everything.".to_string())
 }
 
+/// Uma instalação por vez, mesmo com vários cliques.
+static INSTALLING: AtomicBool = AtomicBool::new(false);
+
 /// Instala pelo winget; sem winget, abre a página oficial de downloads.
 pub fn install() -> Result<(), String> {
+    if INSTALLING.swap(true, Ordering::SeqCst) {
+        return Err("A instalação do Everything já está em andamento.".into());
+    }
+    let result = install_now();
+    INSTALLING.store(false, Ordering::SeqCst);
+    result
+}
+
+fn install_now() -> Result<(), String> {
+    if installed() {
+        return start();
+    }
     let ok = Command::new("winget")
         .args([
             "install",
@@ -154,8 +206,9 @@ pub fn install() -> Result<(), String> {
         ])
         .creation_flags(CREATE_NO_WINDOW)
         .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
+        .ok()
+        .and_then(|s| s.code())
+        .is_some_and(winget_succeeded);
     if ok {
         return start();
     }

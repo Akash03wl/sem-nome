@@ -53,6 +53,13 @@ pub fn file_hit(path: &str, is_dir: bool) -> FileHit {
     FileHit { name, path: path.to_string(), is_dir }
 }
 
+/// O winget terminou bem? "Já instalado" e "nada para atualizar" também contam.
+pub fn winget_succeeded(exit_code: i32) -> bool {
+    const ALREADY_INSTALLED: u32 = 0x8A15_002B;
+    const NO_APPLICABLE_UPGRADE: u32 = 0x8A15_0061;
+    matches!(exit_code as u32, 0 | ALREADY_INSTALLED | NO_APPLICABLE_UPGRADE)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,5 +94,14 @@ mod tests {
         let json = serde_json::to_string(&file_hit("C:\\x", true)).unwrap();
         assert!(json.contains("\"isDir\":true"), "{json}");
         assert_eq!(serde_json::to_string(&NotRunning).unwrap(), "\"notRunning\"");
+    }
+
+    #[test]
+    fn winget_already_installed_counts_as_success() {
+        assert!(winget_succeeded(0));
+        assert!(winget_succeeded(0x8A15_002Bu32 as i32)); // já instalado
+        assert!(winget_succeeded(0x8A15_0061u32 as i32)); // nenhuma atualização aplicável
+        assert!(!winget_succeeded(1));
+        assert!(!winget_succeeded(0x8A15_0014u32 as i32)); // pacote não encontrado
     }
 }

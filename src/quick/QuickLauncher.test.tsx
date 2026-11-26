@@ -342,6 +342,14 @@ describe("QuickLauncher arquivos", () => {
     expect(props.onEverythingFix).toHaveBeenCalledWith("notRunning");
   });
 
+  it("Everything não instalado: o botão leva ao painel em vez de instalar daqui", async () => {
+    const { props } = setup({ onSearchFiles: vi.fn(async () => "notInstalled" as const) });
+    await typeQuery("relatorio");
+    await userEvent.click(await screen.findByRole("button", { name: /Instalar pelo painel/ }));
+    expect(props.onOpenPanel).toHaveBeenCalled();
+    expect(props.onEverythingFix).not.toHaveBeenCalled();
+  });
+
   it("não busca arquivos para contas", async () => {
     const { props } = setup();
     await typeQuery("2+2");

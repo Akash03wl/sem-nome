@@ -63,6 +63,18 @@ describe("useFileSearch", () => {
     expect(result.current.hits).toEqual([]);
   });
 
+  it("limpa os resultados assim que o texto muda", async () => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn(async (q: string) => [hit(`${q}.txt`)]);
+    const { result, rerender } = renderHook(({ q }) => useFileSearch(q, true, fetcher, 150), { initialProps: { q: "rel" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(160);
+    });
+    expect(result.current.hits).toEqual([hit("rel.txt")]);
+    rerender({ q: "relat" });
+    expect(result.current.hits).toEqual([]);
+  });
+
   it("desligado não busca", async () => {
     vi.useFakeTimers();
     const fetcher = vi.fn(async () => [hit("a.txt")]);

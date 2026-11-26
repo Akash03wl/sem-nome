@@ -27,6 +27,8 @@ export function useFileSearch(
 
   useEffect(() => {
     const id = ++seq.current;
+    // Resultados do texto anterior somem na hora: Enter nunca abre um arquivo de outra busca.
+    setHits([]);
     if (!enabled) {
       setHits([]);
       setStatus(null);

@@ -195,7 +195,9 @@ export function QuickLauncher(props: QuickLauncherProps) {
       if (err) setError(err);
       else onHide();
     } else if (r.type === "fileStatus") {
-      setError(await props.onEverythingFix(r.status));
+      // Instalar leva minutos e pede permissão do Windows: isso fica no painel, que mostra o progresso.
+      if (r.status === "notInstalled") onOpenPanel();
+      else setError(await props.onEverythingFix(r.status));
     } else {
       await runCommand(r.command);
     }
@@ -316,7 +318,7 @@ export function QuickLauncher(props: QuickLauncherProps) {
           <span className="quick-result-title">{info.text}</span>
           {info.action && (
             <button type="button" className="quick-inline-btn" onClick={() => void activate(r, mods)}>
-              {info.action}
+              {r.status === "notInstalled" ? "Instalar pelo painel" : info.action}
             </button>
           )}
         </div>

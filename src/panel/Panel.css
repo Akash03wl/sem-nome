@@ -143,3 +143,5 @@
 .panel-link:hover { color: #ffb3a7; }
 .panel-shortcut-form { display: grid; grid-template-columns: 80px 140px minmax(0, 1fr) auto; gap: 8px; }
 .panel-shortcut-form input { width: 100% !important; }
+
+.panel-btn:disabled { opacity: 0.6; cursor: progress; }

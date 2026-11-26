@@ -111,4 +111,17 @@ describe("Panel", () => {
     await userEvent.click(screen.getByRole("button", { name: "Abrir Everything" }));
     expect(fix).toHaveBeenCalledWith("notRunning");
   });
+
+  it("instalar mostra Instalando… e não deixa clicar de novo", async () => {
+    let finish: (v: string | null) => void = () => {};
+    const fix = vi.fn(() => new Promise<string | null>((r) => (finish = r)));
+    setup({ initialSection: "config", everythingStatus: "notInstalled", onEverythingFix: fix });
+    await userEvent.click(screen.getByRole("button", { name: "Instalar Everything" }));
+    const busy = screen.getByRole("button", { name: "Instalando…" });
+    expect(busy).toBeDisabled();
+    await userEvent.click(busy);
+    expect(fix).toHaveBeenCalledTimes(1);
+    finish(null);
+    expect(await screen.findByRole("status")).toBeInTheDocument();
+  });
 });

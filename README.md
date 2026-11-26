@@ -69,7 +69,7 @@ cargo test -p vitra-core    # testes do núcleo
 npm run tauri dev           # abre o app em modo desenvolvimento (Windows)
 ```
 
-Para a busca de arquivos funcionar em `tauri dev`, baixe o [SDK do Everything](https://www.voidtools.com/Everything-SDK.zip) e copie `dll\Everything64.dll` para `src-tauri\resources\` (o CI faz isso sozinho).
+O projeto compila sem nada extra. Para a **busca de arquivos** funcionar em `tauri dev`, baixe o [SDK do Everything](https://www.voidtools.com/Everything-SDK.zip) e copie `dll\Everything64.dll` para `src-tauri\resources\` (o CI faz isso sozinho). Sem ela, o Vitra mostra "DLL do Everything não encontrada".
 
 Estrutura:
 
