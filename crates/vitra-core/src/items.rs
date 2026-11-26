@@ -125,6 +125,7 @@ pub fn item_id(kind: ItemKind, target: &str) -> String {
         ItemKind::Folder => "dir",
         ItemKind::File => "file",
         ItemKind::Site => "site",
+        ItemKind::Mode => "mode",
     };
     format!("{prefix}-{:016x}", fnv1a64(&target.to_lowercase()))
 }

@@ -50,6 +50,7 @@ fn find(state: &AppState, id: &str) -> Option<Item> {
         target: d.target.clone(),
         args: String::new(),
         admin: false,
+        members: vec![],
     })
 }
 
@@ -187,6 +188,7 @@ pub fn add_paths(
                 target: p.clone(),
                 args: String::new(),
                 admin: false,
+                members: vec![],
             })
         })
         .collect();
@@ -225,6 +227,7 @@ pub fn add_site(
         target: url,
         args: String::new(),
         admin: false,
+        members: vec![],
     };
     mutate(&app, &state, |lib| {
         let id = apply(lib, LibOp::AddItem { item })?.unwrap_or_default();

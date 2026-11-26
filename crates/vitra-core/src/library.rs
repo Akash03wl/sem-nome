@@ -2,6 +2,7 @@
 //! Só muda por operações (`LibOp`), aplicadas com `Library::apply`.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 
@@ -18,6 +19,8 @@ pub enum ItemKind {
     Folder,
     File,
     Site,
+    /// Grupo de itens que abrem juntos.
+    Mode,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -31,6 +34,9 @@ pub struct Item {
     pub args: String,
     #[serde(default)]
     pub admin: bool,
+    /// Só para modos: ids dos itens, na ordem em que abrem.
+    #[serde(default)]
+    pub members: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -51,6 +57,8 @@ pub struct Library {
     pub categories: Vec<Category>,
     pub recents: Vec<String>,
     pub hidden: Vec<String>,
+    /// Quantas vezes cada item foi aberto pelo Vitra (ordena a busca).
+    pub launches: BTreeMap<String, u32>,
 }
 
 impl Default for Library {
@@ -62,6 +70,7 @@ impl Default for Library {
             categories: vec![],
             recents: vec![],
             hidden: vec![],
+            launches: BTreeMap::new(),
         }
     }
 }
@@ -83,6 +92,8 @@ pub enum LibOp {
     RecordLaunch { id: String },
     Hide { id: String },
     Unhide { id: String },
+    CreateMode { name: String, members: Vec<String> },
+    SetModeMembers { id: String, members: Vec<String> },
 }
 
 #[derive(Debug, PartialEq)]
@@ -92,6 +103,7 @@ pub enum LibError {
     NameTooLong,
     DuplicateName,
     ReservedName,
+    ModeInMode,
 }
 
 impl fmt::Display for LibError {
@@ -102,6 +114,7 @@ impl fmt::Display for LibError {
             LibError::NameTooLong => "Use no máximo 30 letras.",
             LibError::DuplicateName => "Já existe uma categoria com esse nome.",
             LibError::ReservedName => "Esse nome é reservado.",
+            LibError::ModeInMode => "Um modo não pode conter outro modo.",
         })
     }
 }
@@ -115,6 +128,18 @@ impl Library {
 
     fn require(&self, id: &str) -> Result<(), LibError> {
         self.item(id).map(|_| ()).ok_or(LibError::NotFound)
+    }
+
+    /// Membros de um modo: precisam existir e não podem ser modos.
+    fn check_members(&self, members: &[String]) -> Result<(), LibError> {
+        for id in members {
+            match self.item(id) {
+                None => return Err(LibError::NotFound),
+                Some(i) if i.kind == ItemKind::Mode => return Err(LibError::ModeInMode),
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     fn category_mut(&mut self, id: &str) -> Result<&mut Category, LibError> {
@@ -170,8 +195,12 @@ impl Library {
                 self.favorites.retain(|f| *f != id);
                 self.recents.retain(|r| *r != id);
                 self.hidden.retain(|h| *h != id);
+                self.launches.remove(&id);
                 for c in &mut self.categories {
                     c.items.retain(|i| *i != id);
+                }
+                for m in &mut self.items {
+                    m.members.retain(|i| *i != id);
                 }
             }
             LibOp::RenameItem { id, name } => {
@@ -232,6 +261,7 @@ impl Library {
             }
             LibOp::RecordLaunch { id } => {
                 self.require(&id)?;
+                *self.launches.entry(id.clone()).or_insert(0) += 1;
                 self.recents.retain(|r| *r != id);
                 self.recents.insert(0, id);
                 self.recents.truncate(MAX_RECENTS);
@@ -242,6 +272,40 @@ impl Library {
                 }
             }
             LibOp::Unhide { id } => self.hidden.retain(|h| *h != id),
+            LibOp::CreateMode { name, members } => {
+                let name = name.trim();
+                if name.is_empty() {
+                    return Err(LibError::EmptyName);
+                }
+                self.check_members(&members)?;
+                let n = self
+                    .items
+                    .iter()
+                    .filter_map(|i| i.id.strip_prefix("mode-")?.parse::<u32>().ok())
+                    .max()
+                    .unwrap_or(0)
+                    + 1;
+                let id = format!("mode-{n}");
+                self.items.push(Item {
+                    id: id.clone(),
+                    name: name.to_string(),
+                    kind: ItemKind::Mode,
+                    target: String::new(),
+                    args: String::new(),
+                    admin: false,
+                    members,
+                });
+                return Ok(Some(id));
+            }
+            LibOp::SetModeMembers { id, members } => {
+                self.check_members(&members)?;
+                let m = self
+                    .items
+                    .iter_mut()
+                    .find(|i| i.id == id && i.kind == ItemKind::Mode)
+                    .ok_or(LibError::NotFound)?;
+                m.members = members;
+            }
         }
         Ok(None)
     }
@@ -268,6 +332,7 @@ mod tests {
             target: format!("C:\\{id}.exe"),
             args: String::new(),
             admin: false,
+            members: vec![],
         }
     }
 
@@ -472,5 +537,79 @@ mod tests {
         let p = dir.path().join("library.json");
         fs::write(&p, "{oops").unwrap();
         assert_eq!(load_library(&p), Library::default());
+    }
+
+    fn mode(l: &mut Library, name: &str, members: &[&str]) -> Result<Option<String>, LibError> {
+        l.apply(LibOp::CreateMode {
+            name: name.into(),
+            members: members.iter().map(|m| m.to_string()).collect(),
+        })
+    }
+
+    #[test]
+    fn record_launch_counts_uses() {
+        let mut l = with(&["a"]);
+        for _ in 0..3 {
+            l.apply(LibOp::RecordLaunch { id: "a".into() }).unwrap();
+        }
+        assert_eq!(l.launches.get("a"), Some(&3));
+    }
+
+    #[test]
+    fn create_mode_assigns_id_and_members() {
+        let mut l = with(&["a", "b"]);
+        assert_eq!(mode(&mut l, " Estudo ", &["b", "a"]), Ok(Some("mode-1".into())));
+        assert_eq!(mode(&mut l, "Jogo", &["a"]), Ok(Some("mode-2".into())));
+        let m = l.item("mode-1").unwrap();
+        assert_eq!(m.name, "Estudo");
+        assert_eq!(m.kind, ItemKind::Mode);
+        assert_eq!(m.members, vec!["b", "a"]);
+    }
+
+    #[test]
+    fn create_mode_rejects_empty_name_unknown_and_nested() {
+        let mut l = with(&["a"]);
+        assert_eq!(mode(&mut l, "  ", &["a"]), Err(LibError::EmptyName));
+        assert_eq!(mode(&mut l, "X", &["zz"]), Err(LibError::NotFound));
+        mode(&mut l, "Estudo", &["a"]).unwrap();
+        assert_eq!(mode(&mut l, "Y", &["mode-1"]), Err(LibError::ModeInMode));
+        assert_eq!(l.items.iter().filter(|i| i.kind == ItemKind::Mode).count(), 1);
+    }
+
+    #[test]
+    fn set_mode_members_replaces() {
+        let mut l = with(&["a", "b"]);
+        mode(&mut l, "Estudo", &["a"]).unwrap();
+        l.apply(LibOp::SetModeMembers { id: "mode-1".into(), members: vec!["b".into()] }).unwrap();
+        assert_eq!(l.item("mode-1").unwrap().members, vec!["b"]);
+        assert_eq!(
+            l.apply(LibOp::SetModeMembers { id: "a".into(), members: vec![] }),
+            Err(LibError::NotFound)
+        );
+    }
+
+    #[test]
+    fn remove_item_cleans_mode_members() {
+        let mut l = with(&["a", "b"]);
+        mode(&mut l, "Estudo", &["a", "b"]).unwrap();
+        l.apply(LibOp::RecordLaunch { id: "a".into() }).unwrap();
+        l.apply(LibOp::RemoveItem { id: "a".into() }).unwrap();
+        assert_eq!(l.item("mode-1").unwrap().members, vec!["b"]);
+        assert!(!l.launches.contains_key("a"));
+    }
+
+    #[test]
+    fn libop_create_mode_from_json() {
+        let op: LibOp =
+            serde_json::from_str(r#"{"op":"createMode","name":"Estudo","members":["a"]}"#).unwrap();
+        assert_eq!(op, LibOp::CreateMode { name: "Estudo".into(), members: vec!["a".into()] });
+    }
+
+    #[test]
+    fn old_library_without_launches_loads() {
+        let json = r#"{"version":1,"items":[{"id":"a","name":"A","kind":"app","target":"x","args":"","admin":false}],"favorites":["a"],"categories":[],"recents":[],"hidden":[]}"#;
+        let l: Library = serde_json::from_str(json).unwrap();
+        assert!(l.launches.is_empty());
+        assert!(l.items[0].members.is_empty());
     }
 }
