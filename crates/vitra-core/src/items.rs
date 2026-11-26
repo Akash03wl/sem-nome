@@ -21,7 +21,7 @@ pub fn is_junk(name: &str) -> bool {
 const APP_EXTS: [&str; 7] = ["exe", "lnk", "bat", "cmd", "msc", "url", "appref-ms"];
 
 /// Último pedaço de um caminho do Windows (aceita `\` e `/`, em qualquer sistema).
-fn last_segment(path: &Path) -> String {
+pub(crate) fn last_segment(path: &Path) -> String {
     let text = path.to_string_lossy();
     let trimmed = text.trim_end_matches(['\\', '/']);
     trimmed.rsplit(['\\', '/']).next().unwrap_or(trimmed).to_string()

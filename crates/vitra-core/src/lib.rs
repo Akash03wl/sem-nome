@@ -1,3 +1,4 @@
+pub mod files;
 pub mod geometry;
 pub mod hotkey;
 pub mod items;
