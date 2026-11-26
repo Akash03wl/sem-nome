@@ -2,7 +2,8 @@ import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./theme/tokens.css";
 import * as api from "./lib/api";
-import type { Settings } from "./lib/types";
+import { EMPTY_LIBRARY, type Discovered, type Library, type Settings } from "./lib/types";
+import { setIconLoader } from "./lib/useIcon";
 import { QuickLauncher } from "./quick/QuickLauncher";
 import { Panel } from "./panel/Panel";
 
@@ -18,8 +19,25 @@ function useSettings(): Settings | null {
   return settings;
 }
 
+setIconLoader(api.getIcon);
+
+function useLibrary(): { library: Library; discovered: Discovered[] } {
+  const [library, setLibrary] = useState<Library>(EMPTY_LIBRARY);
+  const [discovered, setDiscovered] = useState<Discovered[]>([]);
+  useEffect(() => {
+    api.getLibrary().then(setLibrary);
+    api.getDiscovered().then(setDiscovered);
+    const offs = [api.onLibraryChanged(setLibrary), api.onAppsDiscovered(setDiscovered)];
+    return () => {
+      offs.forEach((off) => off.then((f) => f()));
+    };
+  }, []);
+  return { library, discovered };
+}
+
 function QuickApp() {
   const settings = useSettings();
+  const { library, discovered } = useLibrary();
   const [nonce, setNonce] = useState(0);
   useEffect(() => {
     const off = api.onQuickShown(() => setNonce((n) => n + 1));
@@ -33,8 +51,13 @@ function QuickApp() {
       accent={settings.accent}
       hotkeyLabel={settings.hotkey}
       showNonce={nonce}
+      library={library}
+      discovered={discovered}
       onHide={() => void api.hideQuick()}
       onOpenPanel={() => void api.openPanel()}
+      onLaunch={api.launchItem}
+      onApply={api.applyOp}
+      onReveal={api.revealItem}
     />
   );
 }
