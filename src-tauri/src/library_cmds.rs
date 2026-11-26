@@ -5,8 +5,10 @@ use std::path::Path;
 use base64::Engine;
 use tauri::{AppHandle, Emitter, Manager, State};
 use vitra_core::items::{
-    classify_path, display_name, item_id, launch_error_message, local_path, normalize_url, site_name,
+    classify_path, display_name, item_id, launch_error_message, local_path, mode_launch_message,
+    normalize_url, site_name,
 };
+use vitra_core::system::SystemCommand;
 use vitra_core::library::{save_library, Item, ItemKind, LibOp, Library};
 
 use crate::win::{self, Discovered};
@@ -113,25 +115,80 @@ pub async fn launch_item(
     admin: bool,
 ) -> Result<(), String> {
     let item = find(&state, &id).ok_or_else(|| launch_error_message(2).unwrap_or_default())?;
+    let (opened, result) = if item.kind == ItemKind::Mode {
+        launch_mode(&state, &item).await
+    } else {
+        let r = launch_one(item.clone(), admin).await;
+        (r.is_ok(), r)
+    };
+    // Abriu (mesmo que só parte de um modo): registra o uso. Falha ao gravar não desfaz a abertura.
+    if opened {
+        let _ = mutate(&app, &state, |lib| {
+            if lib.item(&item.id).is_none() {
+                apply(lib, LibOp::AddItem { item: item.clone() })?;
+            }
+            apply(lib, LibOp::RecordLaunch { id: item.id.clone() })
+        });
+    }
+    result
+}
+
+/// Abre um item comum. Abrir pode esperar o UAC ou um caminho de rede lento:
+/// roda fora das threads assíncronas.
+async fn launch_one(item: Item, admin: bool) -> Result<(), String> {
     ensure_exists(&item.target)?;
-    // Abrir pode esperar o UAC ou um caminho de rede lento: fora das threads assíncronas.
-    let (target, args, elevated) = (item.target.clone(), item.args.clone(), admin || item.admin);
-    tauri::async_runtime::spawn_blocking(move || win::open(&target, &args, elevated))
+    let elevated = admin || item.admin;
+    tauri::async_runtime::spawn_blocking(move || win::open(&item.target, &item.args, elevated))
         .await
-        .map_err(|_| "Não consegui abrir este item.".to_string())??;
-    mutate(&app, &state, |lib| {
-        if lib.item(&item.id).is_none() {
-            apply(lib, LibOp::AddItem { item: item.clone() })?;
+        .map_err(|_| "Não consegui abrir este item.".to_string())?
+}
+
+/// Abre os itens de um modo, em ordem, e resume o que falhou.
+/// Devolve se algum abriu e a mensagem para o usuário.
+async fn launch_mode(state: &AppState, mode: &Item) -> (bool, Result<(), String>) {
+    let members: Vec<Option<Item>> = mode.members.iter().map(|id| find(state, id)).collect();
+    let mut failed = Vec::new();
+    for (id, member) in mode.members.iter().zip(members) {
+        match member {
+            Some(m) => {
+                let name = m.name.clone();
+                if launch_one(m, false).await.is_err() {
+                    failed.push(name);
+                }
+            }
+            None => failed.push(id.clone()),
         }
-        apply(lib, LibOp::RecordLaunch { id: item.id.clone() })
-    })?;
-    Ok(())
+    }
+    let opened = failed.len() < mode.members.len();
+    let result = match mode_launch_message(mode.members.len(), &failed) {
+        None => Ok(()),
+        Some(msg) => Err(msg),
+    };
+    (opened, result)
+}
+
+/// Abre um endereço da web (só http/https).
+#[tauri::command]
+pub async fn open_url(url: String) -> Result<(), String> {
+    let url = normalize_url(&url).map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || win::open(&url, "", false))
+        .await
+        .map_err(|_| "Não consegui abrir o endereço.".to_string())?
+}
+
+#[tauri::command]
+pub async fn run_system_command(cmd: SystemCommand) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || win::run_system(cmd))
+        .await
+        .map_err(|_| "Não consegui executar o comando.".to_string())?
 }
 
 #[tauri::command]
 pub fn reveal_item(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let item = find(&state, &id).ok_or_else(|| launch_error_message(2).unwrap_or_default())?;
-    if item.kind == ItemKind::Site || item.target.to_lowercase().starts_with("shell:appsfolder") {
+    if matches!(item.kind, ItemKind::Site | ItemKind::Mode)
+        || item.target.to_lowercase().starts_with("shell:appsfolder")
+    {
         return Err("Não dá para abrir o local deste app.".into());
     }
     ensure_exists(&item.target)?;
@@ -142,7 +199,7 @@ pub fn reveal_item(state: State<'_, AppState>, id: String) -> Result<(), String>
 #[tauri::command]
 pub async fn get_icon(state: State<'_, AppState>, id: String) -> Result<Option<String>, String> {
     let Some(item) = find(&state, &id) else { return Ok(None) };
-    if item.kind == ItemKind::Site {
+    if matches!(item.kind, ItemKind::Site | ItemKind::Mode) {
         return Ok(None);
     }
     let cache = state.icon_dir.join(format!("{id}.png"));

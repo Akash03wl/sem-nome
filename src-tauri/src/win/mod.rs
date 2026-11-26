@@ -19,6 +19,8 @@ mod apps;
 mod icons;
 #[cfg(windows)]
 mod launch;
+#[cfg(windows)]
+mod system;
 
 #[cfg(windows)]
 pub use apps::discover;
@@ -26,6 +28,8 @@ pub use apps::discover;
 pub use icons::icon_png;
 #[cfg(windows)]
 pub use launch::{open, reveal};
+#[cfg(windows)]
+pub use system::run_system;
 
 #[cfg(not(windows))]
 mod fallback {
@@ -44,7 +48,10 @@ mod fallback {
     pub fn reveal(_path: &str) -> Result<(), String> {
         Err(ONLY_WINDOWS.into())
     }
+    pub fn run_system(_cmd: vitra_core::system::SystemCommand) -> Result<(), String> {
+        Err(ONLY_WINDOWS.into())
+    }
 }
 
 #[cfg(not(windows))]
-pub use fallback::{discover, icon_png, open, reveal};
+pub use fallback::{discover, icon_png, open, reveal, run_system};

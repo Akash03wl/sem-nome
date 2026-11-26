@@ -4,7 +4,7 @@ use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_autostart::ManagerExt;
 use vitra_core::{
     hotkey,
-    settings::{self, plan_save, Settings, ACCENTS},
+    settings::{self, plan_save, validate_shortcut, Settings, ACCENTS},
 };
 
 use crate::{shortcut, windows, AppState};
@@ -37,7 +37,13 @@ pub fn save_settings(
     if !ACCENTS.contains(&next.accent.as_str()) {
         return Err("Cor inválida.".into());
     }
-    let next = Settings { hotkey, ..next };
+    // Cada palavra-chave é validada contra as outras da lista.
+    let mut shortcuts = Vec::with_capacity(next.web_shortcuts.len());
+    for (i, s) in next.web_shortcuts.iter().enumerate() {
+        let others: Vec<_> = next.web_shortcuts.iter().enumerate().filter(|(j, _)| *j != i).map(|(_, o)| o.clone()).collect();
+        shortcuts.push(validate_shortcut(s, &others)?);
+    }
+    let next = Settings { hotkey, web_shortcuts: shortcuts, ..next };
     let failing = state.hotkey_error.lock().unwrap().is_some();
     let plan = plan_save(&current, &next, failing);
 

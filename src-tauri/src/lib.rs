@@ -55,6 +55,8 @@ pub fn run() {
             library_cmds::get_icon,
             library_cmds::add_paths,
             library_cmds::add_site,
+            library_cmds::open_url,
+            library_cmds::run_system_command,
             commands::get_settings,
             commands::save_settings,
             commands::hide_quick,
