@@ -5,6 +5,7 @@ Launcher para Windows: todos os seus programas, pastas, arquivos, sites e senhas
 - Documento do projeto: [docs/superpowers/specs/2026-11-26-vitra-design.md](docs/superpowers/specs/2026-11-26-vitra-design.md)
 - Plano da Fase 1: [docs/superpowers/plans/2026-11-26-vitra-fase-1-base.md](docs/superpowers/plans/2026-11-26-vitra-fase-1-base.md)
 - Plano da Fase 2: [docs/superpowers/plans/2026-11-26-vitra-fase-2-itens.md](docs/superpowers/plans/2026-11-26-vitra-fase-2-itens.md)
+- Plano da Fase 3: [docs/superpowers/plans/2026-11-26-vitra-fase-3-busca.md](docs/superpowers/plans/2026-11-26-vitra-fase-3-busca.md)
 
 ## Como instalar
 
@@ -36,6 +37,16 @@ Depois de instalado, o Vitra fica perto do relógio. Aperte **Alt+Espaço** para
 - [ ] Clique direito → "Abrir como administrador" e "Abrir local do arquivo"
 - [ ] Os **Recentes** aparecem depois de abrir alguns itens
 - [ ] Arrastar um favorito sobre outro muda a ordem
+
+## Checklist de teste da Fase 3
+
+- [ ] Buscar por pedaço do nome (`spot`), por iniciais (`vsc` → Visual Studio Code) e com erro (`spotfy`)
+- [ ] ↑/↓ + Enter abre; Ctrl+Enter abre como administrador; Shift+Enter abre o local
+- [ ] `yt lofi` abre o YouTube pesquisando "lofi"; `g receita de bolo` abre o Google
+- [ ] `250*12` mostra 3.000 e Enter copia
+- [ ] Botões de comando: Bloquear e Suspender funcionam direto; Desligar/Reiniciar/Sair/Lixeira pedem um 2º clique
+- [ ] Criar um modo (Adicionar ▾ → Modo) e abrir: os itens abrem juntos
+- [ ] Criar uma palavra-chave nova em Configurações (ex.: `gh` → `github.com/search?q={q}`)
 
 Onde o Vitra guarda seus dados: `%APPDATA%\Vitra` (configurações e itens) e `%LOCALAPPDATA%\Vitra\icons` (ícones).
 
