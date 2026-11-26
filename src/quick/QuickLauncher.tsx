@@ -40,14 +40,21 @@ export function QuickLauncher({ accent, hotkeyLabel, showNonce, onHide, onOpenPa
   }, [showNonce]);
 
   useEffect(() => {
+    // Limpa ao esconder (e não só ao mostrar), para o texto antigo nunca piscar na reabertura.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        setQuery("");
         onHide();
       }
     };
+    const onBlur = () => setQuery("");
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("blur", onBlur);
+    };
   }, [onHide]);
 
   return (

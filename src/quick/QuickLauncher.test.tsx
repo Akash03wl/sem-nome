@@ -58,3 +58,21 @@ describe("QuickLauncher", () => {
     expect(root.style.getPropertyValue("--accent")).toBe("#3fd0c9");
   });
 });
+
+describe("QuickLauncher ao esconder", () => {
+  it("limpa a busca quando a janela perde o foco", async () => {
+    render(<QuickLauncher accent="#9b82ff" hotkeyLabel="Alt+Space" showNonce={0} onHide={vi.fn()} onOpenPanel={vi.fn()} />);
+    const input = screen.getByPlaceholderText("Buscar programas, pastas, sites…") as HTMLInputElement;
+    await userEvent.type(input, "abc");
+    fireEvent.blur(window);
+    expect(input.value).toBe("");
+  });
+
+  it("limpa a busca ao apertar Esc", async () => {
+    render(<QuickLauncher accent="#9b82ff" hotkeyLabel="Alt+Space" showNonce={0} onHide={vi.fn()} onOpenPanel={vi.fn()} />);
+    const input = screen.getByPlaceholderText("Buscar programas, pastas, sites…") as HTMLInputElement;
+    await userEvent.type(input, "abc");
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(input.value).toBe("");
+  });
+});

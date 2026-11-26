@@ -64,6 +64,28 @@ pub fn save(path: &Path, s: &Settings) -> std::io::Result<()> {
     fs::rename(&tmp, path)
 }
 
+/// O que `save_settings` precisa fazer ao trocar `current` por `next`.
+#[derive(Debug, PartialEq)]
+pub struct SavePlan {
+    /// Tentar registrar o atalho de `next`.
+    pub register_hotkey: bool,
+    /// Se o registro falhar, a gravação toda é recusada (só quando o usuário trocou o atalho).
+    pub hotkey_required: bool,
+    /// Novo valor de "abrir com o Windows", se mudou.
+    pub autostart: Option<bool>,
+}
+
+/// `hotkey_failing`: o atalho atual não pôde ser registrado (ex.: em uso por outro programa).
+/// Nesse caso tentamos de novo, mas sem impedir que as outras preferências sejam salvas.
+pub fn plan_save(current: &Settings, next: &Settings, hotkey_failing: bool) -> SavePlan {
+    let changed = current.hotkey != next.hotkey;
+    SavePlan {
+        register_hotkey: changed || hotkey_failing,
+        hotkey_required: changed,
+        autostart: (current.autostart != next.autostart).then_some(next.autostart),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -149,5 +171,40 @@ mod tests {
         let p = dir.path().join("settings.json");
         fs::write(&p, r##"{"accent":"#123456"}"##).unwrap();
         assert_eq!(load(&p).accent, "#9b82ff");
+    }
+
+    #[test]
+    fn plan_save_accent_only_touches_nothing_else() {
+        let cur = Settings::default();
+        let next = Settings { accent: "#ff8a4c".into(), ..cur.clone() };
+        assert_eq!(
+            plan_save(&cur, &next, false),
+            SavePlan { register_hotkey: false, hotkey_required: false, autostart: None }
+        );
+    }
+
+    #[test]
+    fn plan_save_retries_failing_hotkey_without_blocking() {
+        let cur = Settings::default();
+        let next = Settings { accent: "#ff8a4c".into(), ..cur.clone() };
+        assert_eq!(
+            plan_save(&cur, &next, true),
+            SavePlan { register_hotkey: true, hotkey_required: false, autostart: None }
+        );
+    }
+
+    #[test]
+    fn plan_save_changed_hotkey_is_required() {
+        let cur = Settings::default();
+        let next = Settings { hotkey: "Ctrl+K".into(), ..cur.clone() };
+        let plan = plan_save(&cur, &next, true);
+        assert!(plan.register_hotkey && plan.hotkey_required);
+    }
+
+    #[test]
+    fn plan_save_autostart_toggle() {
+        let cur = Settings::default();
+        let next = Settings { autostart: false, ..cur.clone() };
+        assert_eq!(plan_save(&cur, &next, false).autostart, Some(false));
     }
 }

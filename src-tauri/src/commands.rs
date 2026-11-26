@@ -4,7 +4,7 @@ use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_autostart::ManagerExt;
 use vitra_core::{
     hotkey,
-    settings::{self, Settings, ACCENTS},
+    settings::{self, plan_save, Settings, ACCENTS},
 };
 
 use crate::{shortcut, windows, AppState};
@@ -19,6 +19,12 @@ pub fn get_hotkey_error(state: State<'_, AppState>) -> Option<String> {
     state.hotkey_error.lock().unwrap().clone()
 }
 
+fn set_autostart(app: &AppHandle, enabled: bool) -> Result<(), String> {
+    let autolaunch = app.autolaunch();
+    let result = if enabled { autolaunch.enable() } else { autolaunch.disable() };
+    result.map_err(|_| "Não consegui alterar a inicialização com o Windows.".to_string())
+}
+
 #[tauri::command]
 pub fn save_settings(
     app: AppHandle,
@@ -31,24 +37,49 @@ pub fn save_settings(
     if !ACCENTS.contains(&next.accent.as_str()) {
         return Err("Cor inválida.".into());
     }
+    let next = Settings { hotkey, ..next };
+    let failing = state.hotkey_error.lock().unwrap().is_some();
+    let plan = plan_save(&current, &next, failing);
 
-    if next.autostart != current.autostart {
-        let autolaunch = app.autolaunch();
-        let result = if next.autostart { autolaunch.enable() } else { autolaunch.disable() };
-        result.map_err(|_| "Não consegui alterar a inicialização com o Windows.".to_string())?;
+    // 1. Atalho. Trocado pelo usuário: se falhar, nada é salvo e o antigo continua.
+    //    Igual mas falhando desde o início: tenta de novo sem bloquear o resto.
+    let mut hotkey_ok = !failing;
+    if plan.register_hotkey {
+        match shortcut::replace(&app, &current.hotkey, &next.hotkey) {
+            Ok(()) => hotkey_ok = true,
+            Err(msg) if plan.hotkey_required => return Err(msg),
+            Err(_) => {}
+        }
+    }
+    let undo_hotkey = |app: &AppHandle| {
+        if plan.hotkey_required {
+            let _ = shortcut::replace(app, &next.hotkey, &current.hotkey);
+        }
+    };
+
+    // 2. Abrir com o Windows (desfaz o atalho se falhar).
+    if let Some(enabled) = plan.autostart {
+        if let Err(msg) = set_autostart(&app, enabled) {
+            undo_hotkey(&app);
+            return Err(msg);
+        }
     }
 
-    // Se o atalho falhou na inicialização, `current.hotkey` não está registrado:
-    // `replace` tenta o novo mesmo que seja igual ao antigo.
-    shortcut::replace(&app, &current.hotkey, &hotkey)?;
-    *state.hotkey_error.lock().unwrap() = None;
+    // 3. Gravar (desfaz o que já mudou se falhar).
+    if settings::save(&state.settings_path, &next).is_err() {
+        undo_hotkey(&app);
+        if let Some(enabled) = plan.autostart {
+            let _ = set_autostart(&app, !enabled);
+        }
+        return Err("Não consegui salvar as configurações.".into());
+    }
 
-    let saved = Settings { hotkey, ..next };
-    settings::save(&state.settings_path, &saved)
-        .map_err(|_| "Não consegui salvar as configurações.".to_string())?;
-    *state.settings.lock().unwrap() = saved.clone();
-    let _ = app.emit("settings-changed", saved.clone());
-    Ok(saved)
+    if hotkey_ok {
+        *state.hotkey_error.lock().unwrap() = None;
+    }
+    *state.settings.lock().unwrap() = next.clone();
+    let _ = app.emit("settings-changed", next.clone());
+    Ok(next)
 }
 
 #[tauri::command]
