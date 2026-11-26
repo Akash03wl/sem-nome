@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Panel } from "./Panel";
 import type { Settings } from "../lib/types";
 
-const base: Settings = { version: 1, hotkey: "Alt+Space", accent: "#9b82ff", autostart: true };
+const base: Settings = { version: 1, hotkey: "Alt+Space", accent: "#9b82ff", autostart: true, webShortcuts: [] };
 
 function setup(over: Partial<Parameters<typeof Panel>[0]> = {}) {
   const props = {
