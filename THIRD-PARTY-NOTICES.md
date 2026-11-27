@@ -6,7 +6,7 @@ O Vitra usa estes componentes, cada um com a sua própria licença:
 |---|---|---|
 | [Tauri](https://tauri.app) e plugins oficiais | base do app | MIT / Apache-2.0 |
 | [React](https://react.dev) | interface | MIT |
-| [Everything SDK](https://www.voidtools.com/support/everything/sdk/) (`Everything64.dll`, incluída no instalador) | busca de arquivos | licença do SDK da voidtools (cópia em `Everything-SDK-LICENSE.txt`, instalada junto) |
+| [Everything SDK](https://www.voidtools.com/support/everything/sdk/) (`Everything64.dll`, incluída no instalador) | busca de arquivos | © voidtools; distribuída como vem no SDK público da voidtools, feito para ser usado por outros programas (o pacote do SDK não traz um texto de licença) |
 | [Everything](https://www.voidtools.com) (instalado à parte, pelo usuário) | busca de arquivos | licença da voidtools |
 | [Bitwarden CLI](https://bitwarden.com/help/cli/) (instalada à parte, pelo usuário) | cofre de senhas | GPL-3.0 |
 | [Inter](https://rsms.me/inter/) e [Space Grotesk](https://floriankarsten.github.io/space-grotesk/) (via Fontsource) | fontes | SIL Open Font License 1.1 |
