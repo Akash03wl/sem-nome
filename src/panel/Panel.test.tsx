@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Panel } from "./Panel";
 import type { Settings } from "../lib/types";
 
-const base: Settings = { version: 1, hotkey: "Alt+Space", accent: "#9b82ff", autostart: true, webShortcuts: [{ keyword: "yt", name: "YouTube", url: "https://www.youtube.com/results?search_query={q}" }] };
+const base: Settings = { version: 1, hotkey: "Alt+Space", accent: "#9b82ff", autostart: true, webShortcuts: [{ keyword: "yt", name: "YouTube", url: "https://www.youtube.com/results?search_query={q}" }], vaultLockMinutes: 5 };
 
 function setup(over: Partial<Parameters<typeof Panel>[0]> = {}) {
   const props = {
@@ -123,5 +123,11 @@ describe("Panel", () => {
     expect(fix).toHaveBeenCalledTimes(1);
     finish(null);
     expect(await screen.findByRole("status")).toBeInTheDocument();
+  });
+
+  it("muda tempo de bloqueio do cofre", async () => {
+    const props = setup({ initialSection: "config" });
+    await userEvent.selectOptions(screen.getByLabelText("Travar o cofre depois de"), "15");
+    expect(props.onSave).toHaveBeenCalledWith({ ...base, vaultLockMinutes: 15 });
   });
 });

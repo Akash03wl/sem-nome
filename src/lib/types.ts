@@ -12,7 +12,11 @@ export interface Settings {
   accent: string;
   autostart: boolean;
   webShortcuts: WebShortcut[];
+  /** Minutos sem uso até o cofre travar (1, 5, 15 ou 30). */
+  vaultLockMinutes: number;
 }
+
+export const VAULT_LOCK_CHOICES = [1, 5, 15, 30] as const;
 
 /** Espelho de `vitra_core::system::SystemCommand`. */
 export type SystemCommand = "shutdown" | "restart" | "sleep" | "lock" | "logoff" | "emptyRecycleBin";
@@ -126,3 +130,25 @@ export const EVERYTHING_MESSAGE: Record<Exclude<EverythingStatus, "ready">, { te
   notInstalled: { text: "Instale o Everything para buscar arquivos do PC.", action: "Instalar Everything" },
   dllMissing: { text: "DLL do Everything não encontrada.", action: null },
 };
+
+// ---- Cofre de senhas (Fase 5) ----
+
+export type VaultStatus = "missing" | "unauthenticated" | "locked" | "unlocked";
+
+/** Uma conta do cofre, sem a senha (ela nunca sai do Rust). */
+export interface VaultEntry {
+  id: string;
+  name: string;
+  username: string | null;
+  hasPassword: boolean;
+  hasTotp: boolean;
+  uri: string | null;
+}
+
+export interface VaultView {
+  status: VaultStatus;
+  email: string | null;
+  entries: VaultEntry[];
+}
+
+export type VaultField = "username" | "password" | "totp";

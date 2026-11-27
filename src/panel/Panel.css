@@ -145,3 +145,13 @@
 .panel-shortcut-form input { width: 100% !important; }
 
 .panel-btn:disabled { opacity: 0.6; cursor: progress; }
+
+.panel-select {
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #1c2130;
+  color: var(--text);
+  font: 400 14px var(--font-body);
+}

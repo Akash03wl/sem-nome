@@ -3,7 +3,17 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { Discovered, EverythingStatus, FileHit, LibOp, Library, Settings, SystemCommand } from "./types";
+import type {
+  Discovered,
+  EverythingStatus,
+  FileHit,
+  LibOp,
+  Library,
+  Settings,
+  SystemCommand,
+  VaultField,
+  VaultView,
+} from "./types";
 
 export const getSettings = () => invoke<Settings>("get_settings");
 
@@ -116,3 +126,31 @@ export async function fixEverything(status: EverythingStatus): Promise<string | 
   if (status === "notInstalled") return attempt(() => invoke("everything_install"), "Não consegui instalar o Everything.");
   return null;
 }
+
+// ---- Senhas (Fase 5) ----
+
+export const vaultStatus = () => invoke<VaultView>("vault_status").catch(() => null);
+
+export const vaultLogin = (email: string, password: string, code?: string) =>
+  attempt(() => invoke("vault_login", { email, password, code: code ?? null }), "Não consegui entrar no Bitwarden.");
+
+export const vaultUnlock = (password: string) =>
+  attempt(() => invoke("vault_unlock", { password }), "Não consegui desbloquear o cofre.");
+
+export const vaultLock = () => attempt(() => invoke("vault_lock"), "Não consegui travar o cofre.");
+export const vaultLogout = () => attempt(() => invoke("vault_logout"), "Não consegui sair da conta.");
+export const vaultSync = () => attempt(() => invoke("vault_sync"), "Não consegui sincronizar.");
+
+export const vaultCopy = (id: string, field: VaultField) =>
+  attempt(() => invoke("vault_copy", { id, field }), "Não consegui copiar.");
+
+export const vaultOpenSite = (id: string) => attempt(() => invoke("vault_open_site", { id }), "Não consegui abrir o site.");
+
+export const vaultInstallCli = () =>
+  attempt(() => invoke("vault_install_cli"), "Não consegui instalar a ferramenta do Bitwarden.");
+
+export const onVaultChanged = (cb: (v: VaultView) => void): Promise<UnlistenFn> =>
+  listen<VaultView>("vault-changed", (e) => cb(e.payload));
+
+export const BITWARDEN_SIGNUP = "https://vault.bitwarden.com/#/register";
+export const BITWARDEN_VAULT = "https://vault.bitwarden.com";

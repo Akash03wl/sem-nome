@@ -8,6 +8,8 @@ import { setIconLoader } from "./lib/useIcon";
 import { QuickLauncher } from "./quick/QuickLauncher";
 import { Panel } from "./panel/Panel";
 import { ALL, FAVORITES, ItemsSection } from "./panel/ItemsSection";
+import { VaultSection } from "./panel/VaultSection";
+import type { VaultView } from "./lib/types";
 
 function useSettings(): Settings | null {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -104,6 +106,38 @@ function PanelItems() {
   );
 }
 
+/** Estado do cofre de senhas, atualizado pelos eventos do Rust. */
+function useVault(): VaultView | null {
+  const [view, setView] = useState<VaultView | null>(null);
+  useEffect(() => {
+    api.vaultStatus().then(setView);
+    const off = api.onVaultChanged(setView);
+    return () => {
+      off.then((f) => f());
+    };
+  }, []);
+  return view;
+}
+
+function PanelVault() {
+  const view = useVault();
+  return (
+    <VaultSection
+      view={view}
+      onInstall={api.vaultInstallCli}
+      onCreateAccount={() => void api.openUrl(api.BITWARDEN_SIGNUP)}
+      onLogin={api.vaultLogin}
+      onUnlock={api.vaultUnlock}
+      onLock={api.vaultLock}
+      onLogout={api.vaultLogout}
+      onSync={api.vaultSync}
+      onCopy={api.vaultCopy}
+      onOpenSite={api.vaultOpenSite}
+      onOpenVault={() => void api.openUrl(api.BITWARDEN_VAULT)}
+    />
+  );
+}
+
 function PanelApp() {
   const settings = useSettings();
   const [everything, setEverything] = useState<import("./lib/types").EverythingStatus | null>(null);
@@ -126,6 +160,7 @@ function PanelApp() {
       initialSection={hotkeyError ? "config" : "itens"}
       onSave={api.saveSettings}
       itemsSection={<PanelItems />}
+      vaultSection={<PanelVault />}
       everythingStatus={everything}
       onEverythingFix={async (status) => {
         const err = await api.fixEverything(status);

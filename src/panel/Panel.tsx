@@ -1,9 +1,9 @@
 import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
-import { ACCENTS, ACCENT_NAMES, EVERYTHING_MESSAGE, type EverythingStatus, type Settings } from "../lib/types";
+import { ACCENTS, ACCENT_NAMES, EVERYTHING_MESSAGE, VAULT_LOCK_CHOICES, type EverythingStatus, type Settings } from "../lib/types";
 import { formatHotkey } from "../quick/QuickLauncher";
 import "./Panel.css";
 
-type Section = "itens" | "config";
+type Section = "itens" | "senhas" | "config";
 
 export interface PanelProps {
   settings: Settings;
@@ -17,9 +17,11 @@ export interface PanelProps {
   /** Status do Everything (busca de arquivos); `null` enquanto verifica. */
   everythingStatus?: EverythingStatus | null;
   onEverythingFix?(status: EverythingStatus): Promise<string | null>;
+  /** Conteúdo da aba "Senhas" (a `VaultSection`). */
+  vaultSection?: ReactNode;
 }
 
-export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSection, everythingStatus, onEverythingFix }: PanelProps) {
+export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSection, everythingStatus, onEverythingFix, vaultSection }: PanelProps) {
   const [section, setSection] = useState<Section>(initialSection ?? (hotkeyError ? "config" : "itens"));
   const [current, setCurrent] = useState(settings);
   const [draft, setDraft] = useState(settings.hotkey);
@@ -77,6 +79,11 @@ export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSect
         <button type="button" className={section === "itens" ? "panel-nav is-active" : "panel-nav"} aria-current={section === "itens"} onClick={() => setSection("itens")}>
           Itens
         </button>
+        {vaultSection && (
+          <button type="button" className={section === "senhas" ? "panel-nav is-active" : "panel-nav"} aria-current={section === "senhas"} onClick={() => setSection("senhas")}>
+            Senhas
+          </button>
+        )}
         <button type="button" className={section === "config" ? "panel-nav is-active" : "panel-nav"} aria-current={section === "config"} onClick={() => setSection("config")}>
           Configurações
         </button>
@@ -87,6 +94,13 @@ export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSect
           <section className="panel-items">
             <h1>Itens</h1>
             {itemsSection ?? <p className="panel-empty">Em breve: seus programas e categorias aparecem aqui.</p>}
+          </section>
+        )}
+
+        {section === "senhas" && (
+          <section className="panel-items">
+            <h1>Senhas</h1>
+            {vaultSection}
           </section>
         )}
 
@@ -152,6 +166,25 @@ export function Panel({ settings, hotkeyError, initialSection, onSave, itemsSect
                   />
                 ))}
               </div>
+            </div>
+
+            <div className="panel-row">
+              <div className="panel-row-text">
+                <label htmlFor="vault-lock">Travar o cofre depois de</label>
+                <span className="panel-hint">Tempo sem usar a aba Senhas até pedir a senha mestra de novo.</span>
+              </div>
+              <select
+                id="vault-lock"
+                className="panel-select"
+                value={current.vaultLockMinutes ?? 5}
+                onChange={(e) => apply({ ...current, vaultLockMinutes: Number(e.target.value) }, "Preferência salva.")}
+              >
+                {VAULT_LOCK_CHOICES.map((m) => (
+                  <option key={m} value={m}>
+                    {m === 1 ? "1 minuto" : `${m} minutos`}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {everythingStatus !== undefined && (
