@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Falha de segurança
+    url: https://github.com/Akash03wl/sem-nome/security/advisories/new
+    about: Avise de forma privada, sem abrir uma issue pública.

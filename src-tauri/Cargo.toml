@@ -3,6 +3,8 @@ name = "vitra"
 version = "0.1.0"
 description = "Vitra — todos os seus programas num só lugar"
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/Akash03wl/sem-nome"
 
 [lib]
 name = "vitra_lib"

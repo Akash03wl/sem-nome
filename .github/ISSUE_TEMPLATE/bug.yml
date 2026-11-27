@@ -1,0 +1,28 @@
+name: Problema
+description: Algo não funcionou como deveria
+labels: [bug]
+body:
+  - type: textarea
+    id: oque
+    attributes:
+      label: O que aconteceu?
+      description: Conte o que você fez e o que apareceu. Se puder, mande uma captura de tela.
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: O que você esperava que acontecesse?
+  - type: input
+    id: versao
+    attributes:
+      label: Versão do Vitra
+      placeholder: "0.1.0"
+  - type: input
+    id: windows
+    attributes:
+      label: Versão do Windows
+      placeholder: "Windows 11 23H2"
+  - type: markdown
+    attributes:
+      value: "⚠️ Nunca cole senhas, chaves de API ou códigos 2FA aqui."

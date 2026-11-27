@@ -6,5 +6,9 @@ fn main() {
         let _ = std::fs::create_dir_all("resources");
         let _ = std::fs::write(&dll, []);
     }
+    let lic = std::path::Path::new("resources").join("Everything-SDK-LICENSE.txt");
+    if !lic.exists() {
+        let _ = std::fs::write(&lic, "Everything SDK (c) voidtools - https://www.voidtools.com/support/everything/sdk/\n");
+    }
     tauri_build::build()
 }

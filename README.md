@@ -1,91 +1,107 @@
+<div align="center">
+
 # Vitra
 
-Launcher para Windows: todos os seus programas, pastas, arquivos, sites e senhas num só lugar, com visual de vidro.
+**Todos os seus programas, pastas, arquivos e senhas num só lugar.**
+Aperte <kbd>Alt</kbd> + <kbd>Espaço</kbd>, digite e pronto. A área de trabalho fica limpa.
 
-- Documento do projeto: [docs/superpowers/specs/2026-11-26-vitra-design.md](docs/superpowers/specs/2026-11-26-vitra-design.md)
-- Plano da Fase 1: [docs/superpowers/plans/2026-11-26-vitra-fase-1-base.md](docs/superpowers/plans/2026-11-26-vitra-fase-1-base.md)
-- Plano da Fase 2: [docs/superpowers/plans/2026-11-26-vitra-fase-2-itens.md](docs/superpowers/plans/2026-11-26-vitra-fase-2-itens.md)
-- Plano da Fase 3: [docs/superpowers/plans/2026-11-26-vitra-fase-3-busca.md](docs/superpowers/plans/2026-11-26-vitra-fase-3-busca.md)
-- Plano da Fase 4: [docs/superpowers/plans/2026-11-26-vitra-fase-4-arquivos.md](docs/superpowers/plans/2026-11-26-vitra-fase-4-arquivos.md)
-- Plano da Fase 5: [docs/superpowers/plans/2026-11-27-vitra-fase-5-senhas.md](docs/superpowers/plans/2026-11-27-vitra-fase-5-senhas.md)
+[**⬇ Baixar para Windows**](https://github.com/Akash03wl/sem-nome/releases/latest) · [Novidades](CHANGELOG.md) · [Reportar um problema](https://github.com/Akash03wl/sem-nome/issues/new/choose)
+
+![O pop-up do Vitra](docs/img/popup.png)
+
+</div>
+
+## O que o Vitra faz
+
+- **Abre na hora com <kbd>Alt</kbd>+<kbd>Espaço</kbd>.** O pop-up de vidro aparece no centro da tela e some quando você abre algo ou clica fora.
+- **Encontra seus programas sozinho.** Ele lista o que está instalado no Menu Iniciar e na Microsoft Store, com os ícones de verdade.
+- **Favoritos e categorias.** Monte categorias como Jogos, Trabalho e Sites. Os 6 primeiros favoritos abrem com <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>6</kbd>.
+- **Arraste qualquer coisa para dentro.** Programas, pastas, arquivos e sites vão direto do Windows para o painel.
+- **Uma busca para tudo:**
+  - programas pelo nome, pelas iniciais (`vsc` → Visual Studio Code) ou com erro de digitação;
+  - **qualquer arquivo do PC**, pelo [Everything](https://www.voidtools.com);
+  - contas: `250*12` → **3.000**;
+  - internet: `yt lofi` abre o YouTube e `g receita de bolo` abre o Google;
+  - **senhas** do seu cofre [Bitwarden](https://bitwarden.com).
+- **Comandos do PC num clique:** desligar, reiniciar, suspender, bloquear, sair e esvaziar a lixeira. Os perigosos pedem um segundo clique.
+- **Modos:** um clique abre vários itens juntos (ex.: "Modo estudo" = navegador + pasta da faculdade + música).
+- **Senhas com o Bitwarden:** copie usuário, senha ou código 2FA. A senha some da área de transferência em 30 s, e o cofre trava sozinho.
+
+| Busca de arquivos | Painel | Senhas |
+|---|---|---|
+| ![Busca](docs/img/busca.png) | ![Painel](docs/img/painel.png) | ![Senhas](docs/img/senhas.png) |
 
 ## Como instalar
 
-1. No GitHub, abra a aba **Actions**.
-2. Clique no último **"Build do Vitra (Windows)"** com ✅ verde.
-3. Em **Artifacts**, baixe **Vitra-instalador** (vem em `.zip`) e extraia.
-4. Execute o `Vitra_…_x64-setup.exe`.
-   - O Windows pode mostrar "O Windows protegeu o computador" (o app ainda não tem assinatura digital): clique em **Mais informações → Executar assim mesmo**.
+1. Baixe o **`Vitra_…_x64-setup.exe`** na [página da última versão](https://github.com/Akash03wl/sem-nome/releases/latest).
+2. Abra o arquivo baixado.
+   - Se aparecer **"O Windows protegeu o computador"**, clique em **Mais informações → Executar assim mesmo**. Esse aviso aparece porque o Vitra ainda não tem uma assinatura digital (paga). O código é aberto e cada instalador é gerado automaticamente pelo GitHub a partir dele.
+3. Pronto. O Vitra fica perto do relógio e abre sozinho quando o Windows liga.
 
-Depois de instalado, o Vitra fica perto do relógio. Aperte **Alt+Espaço** para abrir.
+**Requisitos:** Windows 10 ou 11, 64 bits.
 
-## Checklist de teste da Fase 1
+### Primeiros passos
 
-- [ ] `Alt+Espaço` abre e fecha o pop-up
-- [ ] Clicar fora ou apertar Esc esconde o pop-up
-- [ ] O efeito de vidro aparece
-- [ ] O ícone aparece perto do relógio, com o menu (Abrir painel, Configurações, Sair)
-- [ ] Reiniciar o PC → o Vitra volta sozinho, escondido
-- [ ] No painel, trocar o atalho e a cor de destaque funciona
-- [ ] Abrir o Vitra duas vezes não cria uma segunda cópia
+1. Aperte <kbd>Alt</kbd>+<kbd>Espaço</kbd>.
+2. Em **Todos**, clique com o botão direito num programa → **Adicionar aos favoritos**.
+3. Clique em **Abrir painel ›** para criar categorias, adicionar sites e arrastar arquivos.
+4. **Busca de arquivos (opcional):** Painel → Configurações → **Instalar Everything**.
+5. **Senhas (opcional):** Painel → **Senhas**. Lá você instala a ferramenta do Bitwarden, cria uma conta grátis ou entra na sua.
 
-## Checklist de teste da Fase 2
+### Atalhos de teclado
 
-- [ ] Em **Todos** aparecem seus programas, com os ícones certos
-- [ ] Favoritar, criar categoria e mover itens entre categorias
-- [ ] Arrastar um programa, uma pasta e um arquivo do Windows para o painel
-- [ ] Adicionar um site (ex.: `youtube.com`)
-- [ ] `Alt+1…6` abre os favoritos no pop-up
-- [ ] Clique direito → "Abrir como administrador" e "Abrir local do arquivo"
-- [ ] Os **Recentes** aparecem depois de abrir alguns itens
-- [ ] Arrastar um favorito sobre outro muda a ordem
+| Tecla | O que faz |
+|---|---|
+| <kbd>Alt</kbd>+<kbd>Espaço</kbd> | Abre ou fecha o Vitra (dá para trocar em Configurações) |
+| <kbd>↑</kbd> <kbd>↓</kbd> e <kbd>Enter</kbd> | Escolhe e abre um resultado |
+| <kbd>Ctrl</kbd>+<kbd>Enter</kbd> | Abre como administrador |
+| <kbd>Shift</kbd>+<kbd>Enter</kbd> | Abre a pasta do arquivo (numa senha: copia o usuário) |
+| <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>6</kbd> | Abre um dos 6 primeiros favoritos |
+| <kbd>Esc</kbd> | Fecha |
 
-## Checklist de teste da Fase 3
+## Privacidade e segurança
 
-- [ ] Buscar por pedaço do nome (`spot`), por iniciais (`vsc` → Visual Studio Code) e com erro (`spotfy`)
-- [ ] ↑/↓ + Enter abre; Ctrl+Enter abre como administrador; Shift+Enter abre o local
-- [ ] `yt lofi` abre o YouTube pesquisando "lofi"; `g receita de bolo` abre o Google
-- [ ] `250*12` mostra 3.000 e Enter copia
-- [ ] Botões de comando: Bloquear e Suspender funcionam direto; Desligar/Reiniciar/Sair/Lixeira pedem um 2º clique
-- [ ] Criar um modo (Adicionar ▾ → Modo) e abrir: os itens abrem juntos
-- [ ] Criar uma palavra-chave nova em Configurações (ex.: `gh` → `github.com/search?q={q}`)
+- **Nada sai do seu PC.** O Vitra não tem conta própria, não tem servidor e não coleta dados (sem telemetria).
+- Seus itens e configurações ficam em `%APPDATA%\Vitra`, e os ícones em `%LOCALAPPDATA%\Vitra`.
+- **Senhas:**
+  - o Vitra nunca grava a senha mestra nem as senhas em disco;
+  - a interface nunca recebe a senha: quem copia é o próprio Vitra;
+  - senhas copiadas não entram no histórico <kbd>Win</kbd>+<kbd>V</kbd> nem na área de transferência na nuvem.
+  - Detalhes em [SECURITY.md](SECURITY.md).
 
-## Checklist de teste da Fase 4
+## Perguntas frequentes
 
-- [ ] Painel → Configurações → "Busca de arquivos (Everything)": se pedir, clique em **Instalar Everything** (ou **Abrir Everything**)
-- [ ] Buscar um arquivo pelo nome (ex.: `relatório`): aparece em **Arquivos**, no fim da lista
-- [ ] Enter abre o arquivo; Shift+Enter abre a pasta dele
-- [ ] Fechar o Everything e buscar de novo: aparece "O Everything está fechado." com o botão **Abrir Everything**
+**O <kbd>Alt</kbd>+<kbd>Espaço</kbd> não funciona.**
+Outro programa (como o PowerToys Run) pode estar usando esse atalho. O Vitra avisa no painel e deixa você escolher outro em **Configurações**.
 
-## Checklist de teste da Fase 5 (Senhas)
+**Como desinstalo?**
+Configurações do Windows → Aplicativos → **Vitra** → Desinstalar.
 
-- [ ] Painel → **Senhas**: se pedir, clique em **Instalar ferramenta do Bitwarden**
-- [ ] **Criar conta grátis** abre o site do Bitwarden; crie a conta lá e depois entre pelo Vitra
-- [ ] Entrar com e-mail e senha mestra (se tiver 2FA, o Vitra pede o código)
-- [ ] Adicione uma conta em **Abrir no Bitwarden**, depois **Sincronizar**: ela aparece na lista
-- [ ] **Senha** copia; depois de 30 s a área de transferência fica vazia
-- [ ] Busca do pop-up (com o cofre aberto): digite o nome da conta, Enter copia a senha, Shift+Enter copia o usuário
-- [ ] Depois do tempo configurado sem usar, o cofre trava sozinho e pede a senha mestra de novo
+**Preciso do Everything e do Bitwarden?**
+Não, os dois são opcionais. Sem eles, o Vitra continua abrindo seus programas, pastas e sites normalmente.
 
-**Segurança:** o Vitra nunca grava sua senha mestra, a sessão nem as senhas em disco. As senhas ficam só na memória do Vitra enquanto o cofre está aberto, e a tela nunca recebe a senha: quem copia é o próprio Vitra.
+## Para desenvolvedores
 
-Onde o Vitra guarda seus dados: `%APPDATA%\Vitra` (configurações e itens) e `%LOCALAPPDATA%\Vitra\icons` (ícones).
-
-## Para desenvolver
-
-Requisitos: Node 22, Rust estável e (no Windows) WebView2.
+O Vitra é feito com [Tauri 2](https://tauri.app) (Rust) e React + TypeScript.
 
 ```bash
 npm install
-npm test                    # testes da interface
-cargo test -p vitra-core    # testes do núcleo
+npm test                    # testes da interface (Vitest)
+cargo test -p vitra-core    # testes da lógica (Rust, qualquer sistema)
 npm run tauri dev           # abre o app em modo desenvolvimento (Windows)
 ```
 
-O projeto compila sem nada extra. Para a **busca de arquivos** funcionar em `tauri dev`, baixe o [SDK do Everything](https://www.voidtools.com/Everything-SDK.zip) e copie `dll\Everything64.dll` para `src-tauri\resources\` (o CI faz isso sozinho). Sem ela, o Vitra mostra "DLL do Everything não encontrada".
+- `crates/vitra-core/`: lógica pura em Rust (configurações, biblioteca, busca, regras do cofre), testável em qualquer sistema.
+- `src-tauri/`: o app (janelas, bandeja, atalho global, integração com o Windows, Everything e Bitwarden).
+- `src/`: a interface.
+- `docs/superpowers/`: o documento do projeto e os planos de cada fase; `docs/checklist-de-testes.md`: o que conferir à mão.
 
-Estrutura:
+A busca de arquivos em modo desenvolvimento precisa do `Everything64.dll` do [SDK do Everything](https://www.voidtools.com/support/everything/sdk/) em `src-tauri/resources/`. Sem ele, o projeto compila normalmente, mas a busca de arquivos fica indisponível.
 
-- `crates/vitra-core/`: lógica pura em Rust (configurações, biblioteca de itens, atalhos, regras de itens), testável em qualquer sistema
-- `src-tauri/`: o app em si (janelas, bandeja, atalho global, início com o Windows); `src-tauri/src/win/` tem o que só existe no Windows (apps instalados, ícones, abrir itens)
-- `src/`: a interface (React + TypeScript)
+**Testes no Windows de verdade:** a cada envio, o GitHub instala e abre o Vitra num Windows e roda testes de integração com os apps instalados, os ícones, o Everything e o Bitwarden (veja `.github/workflows/build.yml`).
+
+**Publicar uma versão:** atualize a versão em `src-tauri/tauri.conf.json` e no `CHANGELOG.md`, depois rode `git tag vX.Y.Z && git push origin vX.Y.Z`. O GitHub gera o instalador e publica em Releases.
+
+## Licença
+
+[MIT](LICENSE). Componentes de terceiros: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

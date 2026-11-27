@@ -1,0 +1,11 @@
+name: Ideia
+description: Sugira algo novo para o Vitra
+labels: [ideia]
+body:
+  - type: textarea
+    id: ideia
+    attributes:
+      label: Qual é a ideia?
+      description: O que você gostaria que o Vitra fizesse, e por quê?
+    validations:
+      required: true

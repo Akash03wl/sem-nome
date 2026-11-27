@@ -29,5 +29,7 @@
     "typescript": "^5.9.3",
     "vite": "^8.4.0",
     "vitest": "^5.1.2"
-  }
+  },
+  "license": "MIT",
+  "description": "Vitra — lançador para Windows"
 }
