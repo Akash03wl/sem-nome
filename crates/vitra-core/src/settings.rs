@@ -63,7 +63,12 @@ pub struct Settings {
     pub accent: String,
     pub autostart: bool,
     pub web_shortcuts: Vec<WebShortcut>,
+    /// Minutos sem uso até o cofre de senhas travar sozinho.
+    pub vault_lock_minutes: u32,
 }
+
+/// Opções de tempo para travar o cofre.
+pub const VAULT_LOCK_CHOICES: [u32; 4] = [1, 5, 15, 30];
 
 impl Default for Settings {
     fn default() -> Self {
@@ -73,6 +78,7 @@ impl Default for Settings {
             accent: ACCENTS[0].into(),
             autostart: true,
             web_shortcuts: default_shortcuts(),
+            vault_lock_minutes: 5,
         }
     }
 }
@@ -83,6 +89,9 @@ pub fn load(path: &Path) -> Settings {
     let mut s: Settings = store::load_json(path).unwrap_or_default();
     if !ACCENTS.contains(&s.accent.as_str()) {
         s.accent = ACCENTS[0].into();
+    }
+    if !VAULT_LOCK_CHOICES.contains(&s.vault_lock_minutes) {
+        s.vault_lock_minutes = 5;
     }
     s
 }
@@ -126,6 +135,7 @@ mod tests {
             accent: "#3fd0c9".into(),
             autostart: false,
             web_shortcuts: default_shortcuts(),
+            vault_lock_minutes: 5,
         }
     }
 
@@ -290,5 +300,16 @@ mod tests {
             validate_shortcut(&sc("x", "X", "javascript:alert({q})"), &[]),
             Err("Endereço inválido. Ex.: youtube.com".into())
         );
+    }
+
+    #[test]
+    fn vault_lock_minutes_default_and_sanitized() {
+        assert_eq!(Settings::default().vault_lock_minutes, 5);
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        fs::write(&p, r#"{"vaultLockMinutes":15}"#).unwrap();
+        assert_eq!(load(&p).vault_lock_minutes, 15);
+        fs::write(&p, r#"{"vaultLockMinutes":999}"#).unwrap();
+        assert_eq!(load(&p).vault_lock_minutes, 5);
     }
 }
