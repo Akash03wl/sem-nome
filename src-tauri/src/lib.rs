@@ -1,6 +1,8 @@
+mod bw;
 mod commands;
 mod files_cmds;
 mod library_cmds;
+mod vault_cmds;
 mod win;
 mod shortcut;
 mod tray;
@@ -30,6 +32,8 @@ pub struct AppState {
     pub icon_dir: PathBuf,
     /// DLL do Everything (busca de arquivos); `None` se não veio no instalador.
     pub everything: Mutex<Option<win::everything::Everything>>,
+    /// Cofre de senhas: sessão e contas só na memória.
+    pub vault: Mutex<vault_cmds::VaultState>,
 }
 
 pub fn run() {
@@ -48,6 +52,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             library_cmds::get_library,
             library_cmds::get_discovered,
@@ -66,6 +71,15 @@ pub fn run() {
             files_cmds::everything_install,
             files_cmds::open_path,
             files_cmds::reveal_path,
+            vault_cmds::vault_status,
+            vault_cmds::vault_login,
+            vault_cmds::vault_unlock,
+            vault_cmds::vault_lock,
+            vault_cmds::vault_logout,
+            vault_cmds::vault_sync,
+            vault_cmds::vault_copy,
+            vault_cmds::vault_open_site,
+            vault_cmds::vault_install_cli,
             commands::get_settings,
             commands::save_settings,
             commands::hide_quick,
@@ -105,8 +119,10 @@ pub fn run() {
                         .ok()
                         .and_then(|dir| win::everything::Everything::load(&dir.join("Everything64.dll"))),
                 ),
+                vault: Mutex::new(vault_cmds::VaultState::default()),
             });
             library_cmds::spawn_discovery(app.handle().clone());
+            vault_cmds::spawn_auto_lock(app.handle().clone());
 
             if let Some(quick) = app.get_webview_window(windows::QUICK) {
                 windows::apply_glass(&quick);
