@@ -1,0 +1,43 @@
+[package]
+name = "vitra"
+version = "0.1.0"
+description = "Vitra — todos os seus programas num só lugar"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/Akash03wl/sem-nome"
+
+[lib]
+name = "vitra_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2.4"
+auto-launch = "0.6"
+tauri-plugin-single-instance = "2.5"
+window-vibrancy = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+vitra-core = { path = "../crates/vitra-core" }
+tauri-plugin-dialog = "2.8"
+base64 = "0.23"
+arboard = "3.7"
+zeroize = "1.9"
+
+[target.'cfg(windows)'.dependencies]
+png = "0.18"
+libloading = "0.9"
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_System_Com",
+  "Win32_UI_Shell",
+  "Win32_UI_Shell_Common",
+  "Win32_Graphics_Gdi",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_System_Shutdown",
+  "Win32_System_Power",
+  "Win32_System_Registry",
+] }

@@ -1,0 +1,63 @@
+name: Publicar versão
+
+# Ao marcar uma versão (ex.: git tag v0.1.0 && git push origin v0.1.0), gera o
+# instalador e publica em Releases, para qualquer pessoa baixar.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Instalar dependências e testar
+        run: |
+          npm ci
+          npm test
+          cargo test -p vitra-core
+
+      - name: Baixar SDK do Everything
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP "everything-sdk.zip"
+          $dir = Join-Path $env:RUNNER_TEMP "everything-sdk"
+          Invoke-WebRequest -Uri "https://www.voidtools.com/Everything-SDK.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath $dir -Force
+          $dll = Get-ChildItem -Recurse $dir -Filter "Everything64.dll" | Select-Object -First 1
+          if (-not $dll -or $dll.Length -eq 0) { throw "Everything64.dll não encontrada (ou vazia) no SDK" }
+          New-Item -ItemType Directory -Force "src-tauri\\resources" | Out-Null
+          Copy-Item $dll.FullName "src-tauri\\resources\\Everything64.dll"
+          $lic = Get-ChildItem -Recurse $dir -File | Where-Object { $_.Name -match "licen|copying|readme" } | Select-Object -First 1
+          if ($lic) { Copy-Item $lic.FullName "src-tauri\\resources\\Everything-SDK-LICENSE.txt" }
+
+      - name: Gerar instalador e publicar a versão
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Vitra ${{ github.ref_name }}"
+          releaseBody: |
+            ## Como instalar
+
+            1. Baixe **`Vitra_…_x64-setup.exe`** em *Assets*, logo abaixo.
+            2. Abra o arquivo. Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo** (o Vitra ainda não tem assinatura digital paga).
+            3. Pronto: o Vitra fica perto do relógio. Aperte **Alt+Espaço** para abrir.
+
+            Requisitos: Windows 10 ou 11 (64 bits).
+
+            O que há de novo: veja o [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md).
+          releaseDraft: false
+          prerelease: false

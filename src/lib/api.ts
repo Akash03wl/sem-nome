@@ -1,0 +1,165 @@
+// Único arquivo que fala com o Tauri. Os componentes recebem estas funções por props.
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import type {
+  Discovered,
+  EverythingStatus,
+  FileHit,
+  LibOp,
+  Library,
+  Settings,
+  SystemCommand,
+  VaultField,
+  VaultView,
+} from "./types";
+
+export const getSettings = () => invoke<Settings>("get_settings");
+
+/** Devolve `null` se salvou, ou a mensagem de erro para mostrar ao usuário. */
+export async function saveSettings(next: Settings): Promise<string | null> {
+  try {
+    await invoke<Settings>("save_settings", { next });
+    return null;
+  } catch (err) {
+    return typeof err === "string" ? err : "Não consegui salvar as configurações.";
+  }
+}
+
+export const hideQuick = () => invoke<void>("hide_quick");
+export const openPanel = () => invoke<void>("open_panel");
+export const getHotkeyError = () => invoke<string | null>("get_hotkey_error");
+
+export const onQuickShown = (cb: () => void): Promise<UnlistenFn> => listen("quick-shown", () => cb());
+
+export const onSettingsChanged = (cb: (s: Settings) => void): Promise<UnlistenFn> =>
+  listen<Settings>("settings-changed", (e) => cb(e.payload));
+
+export function currentWindowLabel(): "quick" | "panel" {
+  return getCurrentWindow().label === "quick" ? "quick" : "panel";
+}
+
+// ---- Biblioteca (Fase 2) ----
+
+/** Converte o erro de um comando em mensagem para o usuário. */
+async function attempt(run: () => Promise<unknown>, fallback: string): Promise<string | null> {
+  try {
+    await run();
+    return null;
+  } catch (err) {
+    return typeof err === "string" ? err : fallback;
+  }
+}
+
+export const getLibrary = () => invoke<Library>("get_library");
+export const getDiscovered = () => invoke<Discovered[]>("get_discovered");
+export const rediscover = () => invoke<void>("rediscover");
+
+export const applyOp = (op: LibOp) => attempt(() => invoke("library_apply", { op }), "Não consegui salvar.");
+
+export const launchItem = (id: string, admin = false) =>
+  attempt(() => invoke("launch_item", { id, admin }), "Não consegui abrir este item.");
+
+export const revealItem = (id: string) =>
+  attempt(() => invoke("reveal_item", { id }), "Não consegui abrir o local do arquivo.");
+
+export const getIcon = (id: string) => invoke<string | null>("get_icon", { id }).catch(() => null);
+
+export const addPaths = (paths: string[], category: string | null) =>
+  attempt(() => invoke("add_paths", { paths, category }), "Não consegui adicionar.");
+
+export const addSite = (name: string, url: string, category: string | null) =>
+  attempt(() => invoke("add_site", { name, url, category }), "Não consegui adicionar o site.");
+
+/** Abre o seletor do Windows e adiciona o que for escolhido. `null` se deu certo ou se cancelou. */
+export async function pickAndAdd(category: string | null, folders: boolean): Promise<string | null> {
+  const picked = await openDialog({ multiple: true, directory: folders });
+  if (!picked) return null;
+  const paths = Array.isArray(picked) ? picked : [picked];
+  return paths.length ? addPaths(paths, category) : null;
+}
+
+export const onLibraryChanged = (cb: (l: Library) => void): Promise<UnlistenFn> =>
+  listen<Library>("library-changed", (e) => cb(e.payload));
+
+export const onAppsDiscovered = (cb: (d: Discovered[]) => void): Promise<UnlistenFn> =>
+  listen<Discovered[]>("apps-discovered", (e) => cb(e.payload));
+
+// ---- Busca e comandos (Fase 3) ----
+
+export const openUrl = (url: string) => attempt(() => invoke("open_url", { url }), "Não consegui abrir o endereço.");
+
+export const runSystemCommand = (cmd: SystemCommand) =>
+  attempt(() => invoke("run_system_command", { cmd }), "Não consegui executar o comando.");
+
+export async function copyText(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Área de transferência indisponível: nada a fazer além de não travar.
+  }
+}
+
+// ---- Arquivos (Fase 4) ----
+
+/** Arquivos do PC pelo Everything, ou o motivo de não poder buscar. */
+export async function searchFiles(query: string): Promise<FileHit[] | EverythingStatus> {
+  try {
+    return await invoke<FileHit[]>("search_files", { query });
+  } catch (err) {
+    return typeof err === "string" ? (err as EverythingStatus) : "notRunning";
+  }
+}
+
+export const everythingStatus = () => invoke<EverythingStatus>("everything_status").catch(() => "notRunning" as const);
+
+export const openPath = (path: string, admin: boolean) =>
+  attempt(() => invoke("open_path", { path, admin }), "Não consegui abrir este item.");
+
+export const revealPath = (path: string) =>
+  attempt(() => invoke("reveal_path", { path }), "Não consegui abrir o local do arquivo.");
+
+/** Abre o Everything (se está fechado) ou instala (se falta). */
+export async function fixEverything(status: EverythingStatus): Promise<string | null> {
+  if (status === "notRunning") return attempt(() => invoke("everything_start"), "Não consegui abrir o Everything.");
+  if (status === "notInstalled") return attempt(() => invoke("everything_install"), "Não consegui instalar o Everything.");
+  return null;
+}
+
+// ---- Senhas (Fase 5) ----
+
+export const vaultStatus = () => invoke<VaultView>("vault_status").catch(() => null);
+
+export const vaultLogin = (email: string, password: string, code?: string, method?: number) =>
+  attempt(
+    () => invoke("vault_login", { email, password, code: code ?? null, method: method ?? null }),
+    "Não consegui entrar no Bitwarden.",
+  );
+
+export const vaultLoginApiKey = (clientId: string, clientSecret: string) =>
+  attempt(() => invoke("vault_login_apikey", { clientId, clientSecret }), "Não consegui entrar com a chave de API.");
+
+export const vaultUnlock = (password: string) =>
+  attempt(() => invoke("vault_unlock", { password }), "Não consegui desbloquear o cofre.");
+
+export const vaultLock = () => attempt(() => invoke("vault_lock"), "Não consegui travar o cofre.");
+export const vaultLogout = () => attempt(() => invoke("vault_logout"), "Não consegui sair da conta.");
+export const vaultSync = () => attempt(() => invoke("vault_sync"), "Não consegui sincronizar.");
+
+export const vaultCopy = (id: string, field: VaultField) =>
+  attempt(() => invoke("vault_copy", { id, field }), "Não consegui copiar.");
+
+export const vaultOpenSite = (id: string) => attempt(() => invoke("vault_open_site", { id }), "Não consegui abrir o site.");
+
+export const vaultInstallCli = () =>
+  attempt(() => invoke("vault_install_cli"), "Não consegui instalar a ferramenta do Bitwarden.");
+
+export const onVaultChanged = (cb: (v: VaultView) => void): Promise<UnlistenFn> =>
+  listen<VaultView>("vault-changed", (e) => cb(e.payload));
+
+export const BITWARDEN_SIGNUP = "https://vault.bitwarden.com/#/register";
+export const BITWARDEN_VAULT = "https://vault.bitwarden.com";
+
+/** Avisa o Rust que esta janela carregou (usado pelo teste automático do app instalado). */
+export const frontendReady = (label: string) => invoke("frontend_ready", { label }).catch(() => {});
