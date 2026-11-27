@@ -5,6 +5,7 @@ import {
   type FileHit,
   type Library,
   type SystemCommand,
+  type VaultEntry,
   type WebShortcut,
 } from "../lib/types";
 import type { Entry } from "../items/actions";
@@ -18,7 +19,8 @@ export type SearchResult =
   | { type: "item"; id: string; entry: Entry; score: number }
   | { type: "command"; id: string; command: SystemCommand; label: string }
   | { type: "file"; id: string; hit: FileHit }
-  | { type: "fileStatus"; id: "files-status"; status: Exclude<EverythingStatus, "ready"> };
+  | { type: "fileStatus"; id: "files-status"; status: Exclude<EverythingStatus, "ready"> }
+  | { type: "password"; id: string; entry: VaultEntry };
 
 export interface SearchContext {
   library: Library;
@@ -68,4 +70,18 @@ export function search(input: string, ctx: SearchContext, limit = 30): SearchRes
     if (score(q, c.label) > 0) out.push({ type: "command", id: `cmd:${c.id}`, command: c.id, label: c.label });
   }
   return out;
+}
+
+const MAX_PASSWORDS = 10;
+
+/** Contas do cofre (só existem com o cofre desbloqueado) que combinam com o texto. */
+export function searchVault(input: string, entries: VaultEntry[]): SearchResult[] {
+  const q = input.trim();
+  if (q.length < 2 || entries.length === 0) return [];
+  return entries
+    .map((entry) => ({ entry, s: Math.max(score(q, entry.name), score(q, entry.username ?? "")) }))
+    .filter((r) => r.s > 0)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, MAX_PASSWORDS)
+    .map(({ entry }) => ({ type: "password" as const, id: `pw:${entry.id}`, entry }));
 }

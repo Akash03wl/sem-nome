@@ -228,3 +228,5 @@
   font-size: 12px;
   cursor: pointer;
 }
+
+.quick-key-icon { color: var(--accent); }

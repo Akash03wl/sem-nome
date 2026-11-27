@@ -3,7 +3,7 @@ import { normalize } from "./normalize";
 import { score } from "./fuzzy";
 import { calculate, formatNumber } from "./calc";
 import { matchShortcut } from "./web";
-import { search } from "./search";
+import { search, searchVault } from "./search";
 import type { Discovered, Library, WebShortcut } from "../lib/types";
 
 const shortcuts: WebShortcut[] = [
@@ -168,5 +168,20 @@ describe("search", () => {
 
   it("acha app de Todos", () => {
     expect(search("snip", ctx)[0]).toMatchObject({ type: "item", id: "app-s" });
+  });
+});
+
+describe("searchVault", () => {
+  const entries = [
+    { id: "1", name: "Banco", username: "ana", hasPassword: true, hasTotp: false, uri: "https://banco.com" },
+    { id: "2", name: "YouTube", username: "ana@x.com", hasPassword: true, hasTotp: false, uri: null },
+  ];
+  it("senhas só quando há entradas", () => {
+    expect(searchVault("banco", [])).toEqual([]);
+    expect(searchVault("banco", entries)).toEqual([expect.objectContaining({ type: "password", id: "pw:1" })]);
+  });
+  it("acha pelo usuário e ignora texto curto", () => {
+    expect(searchVault("ana@x", entries).map((r) => r.id)).toEqual(["pw:2"]);
+    expect(searchVault("b", entries)).toEqual([]);
   });
 });

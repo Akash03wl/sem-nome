@@ -2,7 +2,7 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { QuickLauncher, formatHotkey } from "./QuickLauncher";
-import type { Discovered, EverythingStatus, FileHit, Library } from "../lib/types";
+import type { Discovered, EverythingStatus, FileHit, Library, VaultEntry } from "../lib/types";
 
 const item = (id: string, name: string) => ({ id, name, kind: "app" as const, target: `C:\\${name}.exe`, args: "", admin: false });
 
@@ -42,6 +42,8 @@ function setup(over: Partial<Parameters<typeof QuickLauncher>[0]> = {}) {
     onOpenPath: vi.fn(async () => null as string | null),
     onRevealPath: vi.fn(async () => null as string | null),
     onEverythingFix: vi.fn(async () => null as string | null),
+    vault: [] as VaultEntry[],
+    onVaultCopy: vi.fn(async () => null as string | null),
     ...over,
   };
   const utils = render(<QuickLauncher {...props} />);
@@ -355,5 +357,19 @@ describe("QuickLauncher arquivos", () => {
     await typeQuery("2+2");
     await new Promise((r) => setTimeout(r, 250));
     expect(props.onSearchFiles).not.toHaveBeenCalled();
+  });
+});
+
+describe("QuickLauncher senhas", () => {
+  const banco: VaultEntry = { id: "1", name: "Banco Digital", username: "ana", hasPassword: true, hasTotp: false, uri: null };
+
+  it("Enter copia a senha e Shift+Enter o usuário", async () => {
+    const { props } = setup({ vault: [banco] });
+    await userEvent.type(screen.getByPlaceholderText("Buscar programas, pastas, sites…"), "banco digital");
+    expect(screen.getByRole("listbox", { name: "Resultados" })).toHaveTextContent("Senhas");
+    await userEvent.keyboard("{Enter}");
+    expect(props.onVaultCopy).toHaveBeenCalledWith("1", "password");
+    await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(props.onVaultCopy).toHaveBeenCalledWith("1", "username");
   });
 });

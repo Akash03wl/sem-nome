@@ -8,6 +8,8 @@ import {
   type LibOp,
   type Library,
   type SystemCommand,
+  type VaultEntry,
+  type VaultField,
   type WebShortcut,
 } from "../lib/types";
 import { fileSearchEnabled, useFileSearch } from "../search/useFileSearch";
@@ -23,7 +25,7 @@ import {
   visibleDiscovered,
   type Entry,
 } from "../items/actions";
-import { search, type SearchResult } from "../search/search";
+import { search, searchVault, type SearchResult } from "../search/search";
 import { useConfirm } from "./useConfirm";
 import "./QuickLauncher.css";
 
@@ -50,6 +52,9 @@ export interface QuickLauncherProps {
   onRevealPath(path: string): Promise<string | null>;
   /** Abre ou instala o Everything, conforme o status. */
   onEverythingFix(status: EverythingStatus): Promise<string | null>;
+  /** Contas do cofre (vazio quando travado). */
+  vault: VaultEntry[];
+  onVaultCopy(id: string, field: VaultField): Promise<string | null>;
 }
 
 const KEY_NAMES: Record<string, string> = { Space: "Espaço", Super: "Win", Esc: "Esc" };
@@ -72,6 +77,7 @@ const GROUP_TITLE: Record<SearchResult["type"], string> = {
   command: "Comandos do PC",
   file: "Arquivos",
   fileStatus: "Arquivos",
+  password: "Senhas",
 };
 
 /** "C:\\Docs\\a.pdf" → "C:\\Docs" */
@@ -125,12 +131,14 @@ export function QuickLauncher(props: QuickLauncherProps) {
     [query, library, discovered, props.shortcuts],
   );
   const files = useFileSearch(query, fileSearchEnabled(query, props.shortcuts), props.onSearchFiles);
+  const passwords = useMemo(() => searchVault(query, props.vault), [query, props.vault]);
   const results = useMemo<SearchResult[]>(() => {
-    if (files.status && files.status !== "ready") {
-      return [...baseResults, { type: "fileStatus", id: "files-status", status: files.status }];
-    }
-    return [...baseResults, ...files.hits.map((hit) => ({ type: "file" as const, id: `file:${hit.path}`, hit }))];
-  }, [baseResults, files]);
+    const fileRows: SearchResult[] =
+      files.status && files.status !== "ready"
+        ? [{ type: "fileStatus", id: "files-status", status: files.status }]
+        : files.hits.map((hit) => ({ type: "file" as const, id: `file:${hit.path}`, hit }));
+    return [...baseResults, ...fileRows, ...passwords];
+  }, [baseResults, files.hits, files.status, passwords]);
   const searching = query.trim() !== "";
 
   useEffect(() => {
@@ -192,6 +200,11 @@ export function QuickLauncher(props: QuickLauncherProps) {
         return;
       }
       const err = await props.onOpenPath(r.hit.path, mods.ctrl);
+      if (err) setError(err);
+      else onHide();
+    } else if (r.type === "password") {
+      const field: VaultField = mods.shift || !r.entry.hasPassword ? "username" : "password";
+      const err = await props.onVaultCopy(r.entry.id, field);
       if (err) setError(err);
       else onHide();
     } else if (r.type === "fileStatus") {
@@ -308,6 +321,17 @@ export function QuickLauncher(props: QuickLauncherProps) {
           </span>
           <span className="quick-result-title">{r.hit.name}</span>
           <span className="quick-result-detail quick-file-path">{parentDir(r.hit.path)}</span>
+        </button>
+      );
+    }
+    if (r.type === "password") {
+      return (
+        <button type="button" className="quick-result-btn quick-file" onClick={() => void activate(r, mods)}>
+          <span className="quick-file-icon quick-key-icon" aria-hidden="true">
+            ●
+          </span>
+          <span className="quick-result-title">{r.entry.name}</span>
+          <span className="quick-result-detail">{r.entry.username ? `${r.entry.username} · ` : ""}↵ senha · ⇧↵ usuário</span>
         </button>
       );
     }

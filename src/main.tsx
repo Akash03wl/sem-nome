@@ -41,6 +41,7 @@ function useLibrary(): { library: Library; discovered: Discovered[] } {
 
 function QuickApp() {
   const settings = useSettings();
+  const vault = useVault();
   const { library, discovered } = useLibrary();
   const [nonce, setNonce] = useState(0);
   useEffect(() => {
@@ -70,6 +71,8 @@ function QuickApp() {
       onOpenPath={api.openPath}
       onRevealPath={api.revealPath}
       onEverythingFix={api.fixEverything}
+      vault={vault?.status === "unlocked" ? vault.entries : []}
+      onVaultCopy={api.vaultCopy}
     />
   );
 }
