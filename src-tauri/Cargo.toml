@@ -22,7 +22,7 @@ serde_json = "1"
 vitra-core = { path = "../crates/vitra-core" }
 tauri-plugin-dialog = "2.8"
 base64 = "0.23"
-tauri-plugin-clipboard-manager = "2.5"
+arboard = "3.7"
 zeroize = "1.9"
 
 [target.'cfg(windows)'.dependencies]

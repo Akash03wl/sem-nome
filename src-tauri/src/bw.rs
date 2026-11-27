@@ -22,6 +22,16 @@ pub fn find() -> Option<PathBuf> {
 
 /// Roda `bw` e devolve o stdout; em erro, o stderr (ou stdout) para interpretar.
 pub fn run(args: &[&str], session: Option<&str>, password: Option<&str>) -> Result<String, String> {
+    run_env(args, session, password, &[])
+}
+
+/// Como `run`, com variáveis extras (ex.: `BW_CLIENTID`/`BW_CLIENTSECRET` da chave de API).
+pub fn run_env(
+    args: &[&str],
+    session: Option<&str>,
+    password: Option<&str>,
+    extra: &[(&str, &str)],
+) -> Result<String, String> {
     let exe = find().ok_or_else(|| "A ferramenta do Bitwarden não está instalada.".to_string())?;
     let mut cmd = Command::new(exe);
     cmd.args(args).env("BW_NOINTERACTION", "true").env_remove("BW_SESSION");
@@ -31,19 +41,26 @@ pub fn run(args: &[&str], session: Option<&str>, password: Option<&str>) -> Resu
     if let Some(p) = password {
         cmd.env(PASSWORD_ENV, p);
     }
+    for (k, v) in extra {
+        cmd.env(k, v);
+    }
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
-    let out = cmd.output().map_err(|_| "Não consegui executar a ferramenta do Bitwarden.".to_string())?;
-    if out.status.success() {
+    let mut out = cmd.output().map_err(|_| "Não consegui executar a ferramenta do Bitwarden.".to_string())?;
+    let result = if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
     } else {
         let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
         Err(if err.is_empty() { String::from_utf8_lossy(&out.stdout).trim().to_string() } else { err })
-    }
+    };
+    // A saída pode ter a chave de sessão ou o cofre inteiro: apaga os buffers brutos.
+    zeroize::Zeroize::zeroize(&mut out.stdout);
+    zeroize::Zeroize::zeroize(&mut out.stderr);
+    result
 }
 
 pub fn password_env() -> &'static str {

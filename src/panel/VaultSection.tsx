@@ -9,7 +9,10 @@ export interface VaultSectionProps {
   view: VaultView | null;
   onInstall(): Promise<string | null>;
   onCreateAccount(): void;
-  onLogin(email: string, password: string, code?: string): Promise<string | null>;
+  /** `method`: 0 = app autenticador, 1 = e-mail (só quando há código). */
+  onLogin(email: string, password: string, code?: string, method?: number): Promise<string | null>;
+  /** Login pela chave de API do Bitwarden (passa pela confirmação de novo dispositivo). */
+  onLoginApiKey(clientId: string, clientSecret: string): Promise<string | null>;
   onUnlock(password: string): Promise<string | null>;
   onLock(): Promise<string | null>;
   onLogout(): Promise<string | null>;
@@ -20,6 +23,7 @@ export interface VaultSectionProps {
 }
 
 const NEEDS_CODE = "Digite o código de verificação (2FA).";
+const NEW_DEVICE_HINT = "confirmar este computador";
 
 const COPIED: Record<VaultField, string> = {
   username: "Usuário copiado!",
@@ -43,6 +47,8 @@ export function VaultSection(p: VaultSectionProps) {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [askCode, setAskCode] = useState(false);
+  const [method, setMethod] = useState(0);
+  const [apiKey, setApiKey] = useState<{ id: string; secret: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -61,12 +67,23 @@ export function VaultSection(p: VaultSectionProps) {
     e.preventDefault();
     const pw = password;
     setPassword("");
-    const err = await run(() => p.onLogin(email, pw, askCode && code ? code : undefined));
+    const withCode = askCode && code ? code : undefined;
+    const err = await run(() => p.onLogin(email, pw, withCode, withCode ? method : undefined));
     if (err === NEEDS_CODE) setAskCode(true);
+    if (err?.includes(NEW_DEVICE_HINT)) setApiKey({ id: "", secret: "" });
     if (!err) {
       setCode("");
       setAskCode(false);
     }
+  }
+
+  async function loginApiKey(e: FormEvent) {
+    e.preventDefault();
+    if (!apiKey) return;
+    const { id, secret } = apiKey;
+    setApiKey({ id, secret: "" });
+    const err = await run(() => p.onLoginApiKey(id, secret));
+    if (!err) setApiKey(null);
   }
 
   async function unlock(e: FormEvent) {
@@ -123,16 +140,49 @@ export function VaultSection(p: VaultSectionProps) {
             <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
           </label>
           {askCode && (
-            <label>
-              Código de verificação
-              <input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />
-            </label>
+            <>
+              <label>
+                De onde vem o código?
+                <select value={method} onChange={(e) => setMethod(Number(e.target.value))}>
+                  <option value={0}>App autenticador</option>
+                  <option value={1}>E-mail</option>
+                </select>
+              </label>
+              <label>
+                Código de verificação
+                <input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />
+              </label>
+              <span className="vault-muted">Por segurança, digite a senha mestra de novo junto com o código.</span>
+            </>
           )}
-          {alert}
+          {!apiKey && alert}
           <button type="submit" className="vault-primary" disabled={busy}>
             {busy ? "Entrando…" : "Entrar"}
           </button>
         </form>
+        {apiKey ? (
+          <form className="vault-form vault-apikey" onSubmit={loginApiKey}>
+            <p className="vault-muted">
+              No site do Bitwarden: Configurações → Segurança → Chaves → <b>Ver chave de API</b>. Copie os dois valores para cá.
+            </p>
+            <label>
+              client_id
+              <input value={apiKey.id} autoComplete="off" onChange={(e) => setApiKey({ ...apiKey, id: e.target.value })} />
+            </label>
+            <label>
+              client_secret
+              <input type="password" autoComplete="off" value={apiKey.secret} onChange={(e) => setApiKey({ ...apiKey, secret: e.target.value })} />
+            </label>
+            {alert}
+            <button type="submit" className="vault-primary" disabled={busy}>
+              Entrar com a chave
+            </button>
+          </form>
+        ) : (
+          <button type="button" className="vault-link" onClick={() => setApiKey({ id: "", secret: "" })}>
+            Entrar com chave de API
+          </button>
+        )}
       </div>
     );
   }

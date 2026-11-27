@@ -111,6 +111,8 @@ pub enum LoginError {
     TwoFactorRequired,
     InvalidCode,
     NoInternet,
+    /// Conta sem 2FA entrando de um computador novo: o Bitwarden pede confirmação por e-mail.
+    NewDevice,
     Other(String),
 }
 
@@ -121,6 +123,9 @@ impl fmt::Display for LoginError {
             LoginError::TwoFactorRequired => f.write_str("Digite o código de verificação (2FA)."),
             LoginError::InvalidCode => f.write_str("Código de verificação inválido."),
             LoginError::NoInternet => f.write_str("Sem conexão com o Bitwarden. Verifique a internet."),
+            LoginError::NewDevice => f.write_str(
+                "O Bitwarden pediu para confirmar este computador. Entre com a chave de API (abaixo) — é o jeito oficial para isso.",
+            ),
             LoginError::Other(msg) => f.write_str(msg),
         }
     }
@@ -133,10 +138,14 @@ pub fn classify_login_error(stderr: &str) -> LoginError {
     if has(&["invalid master password", "username or password is incorrect"]) {
         return LoginError::WrongPassword;
     }
+    if has(&["new device"]) {
+        return LoginError::NewDevice;
+    }
     if lower.contains("invalid") && has(&["code", "token"]) {
         return LoginError::InvalidCode;
     }
-    if has(&["two-step", "two factor", "two-factor", "2fa"]) {
+    // "Code is required." (um método) e "--method <method> required." (vários): textos da CLI.
+    if has(&["code is required", "--method", "two-step", "two factor", "two-factor", "2fa"]) {
         return LoginError::TwoFactorRequired;
     }
     if has(&["econnrefused", "enotfound", "fetch failed", "network", "etimedout"]) {
@@ -154,6 +163,25 @@ pub fn should_lock(last_used_secs_ago: u64, minutes: u32) -> bool {
 /// Apagar a área de transferência? Só se ainda tiver o que o Vitra escreveu.
 pub fn should_clear_clipboard(current: &str, written: &str) -> bool {
     !written.is_empty() && current == written
+}
+
+/// Evita que uma operação lenta (sincronizar, entrar) reabra o cofre depois de ele ser travado:
+/// cada trava avança a geração, e só vale o resultado de quem começou na geração atual.
+#[derive(Default, Debug)]
+pub struct SessionGuard {
+    generation: u64,
+}
+
+impl SessionGuard {
+    pub fn begin(&self) -> u64 {
+        self.generation
+    }
+    pub fn invalidate(&mut self) {
+        self.generation += 1;
+    }
+    pub fn still_valid(&self, token: u64) -> bool {
+        token == self.generation
+    }
 }
 
 #[cfg(test)]
@@ -226,8 +254,26 @@ mod tests {
 
     #[test]
     fn classify_login_error_two_factor() {
+        // Textos reais da CLI com BW_NOINTERACTION.
+        assert_eq!(classify_login_error("Code is required."), LoginError::TwoFactorRequired);
+        assert_eq!(classify_login_error("--method <method> required."), LoginError::TwoFactorRequired);
         assert_eq!(classify_login_error("Two-step login is required"), LoginError::TwoFactorRequired);
-        assert_eq!(classify_login_error("Code is required. Two factor"), LoginError::TwoFactorRequired);
+    }
+
+    #[test]
+    fn classify_login_error_new_device() {
+        assert_eq!(classify_login_error("New device verification required."), LoginError::NewDevice);
+        assert_eq!(classify_login_error("Please provide the new device OTP"), LoginError::NewDevice);
+    }
+
+    #[test]
+    fn session_guard_rejects_results_started_before_a_lock() {
+        let mut g = SessionGuard::default();
+        let before = g.begin();
+        assert!(g.still_valid(before));
+        g.invalidate();
+        assert!(!g.still_valid(before));
+        assert!(g.still_valid(g.begin()));
     }
 
     #[test]

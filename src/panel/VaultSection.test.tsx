@@ -21,6 +21,7 @@ function setup(view: VaultView | null, over: Partial<Parameters<typeof VaultSect
     onInstall: vi.fn(ok),
     onCreateAccount: vi.fn(),
     onLogin: vi.fn(ok),
+    onLoginApiKey: vi.fn(ok),
     onUnlock: vi.fn(ok),
     onLock: vi.fn(ok),
     onLogout: vi.fn(ok),
@@ -49,21 +50,42 @@ describe("VaultSection", () => {
     await userEvent.type(screen.getByLabelText("E-mail"), "ana@x.com");
     await userEvent.type(screen.getByLabelText("Senha mestra"), "segredo");
     await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
-    expect(props.onLogin).toHaveBeenCalledWith("ana@x.com", "segredo", undefined);
+    expect(props.onLogin).toHaveBeenCalledWith("ana@x.com", "segredo", undefined, undefined);
     expect(screen.getByLabelText("Senha mestra")).toHaveValue("");
   });
 
-  it("pede código 2FA", async () => {
+  it("pede código 2FA e de onde ele vem (uma tentativa só)", async () => {
     const onLogin = vi.fn(async (_e: string, _p: string, code?: string) => (code ? null : "Digite o código de verificação (2FA)."));
     setup({ status: "unauthenticated", email: null, entries: [] }, { onLogin });
     await userEvent.type(screen.getByLabelText("E-mail"), "ana@x.com");
     await userEvent.type(screen.getByLabelText("Senha mestra"), "segredo");
     await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Digite o código de verificação (2FA).");
+    await userEvent.selectOptions(screen.getByLabelText("De onde vem o código?"), "1");
     await userEvent.type(screen.getByLabelText("Senha mestra"), "segredo");
     await userEvent.type(screen.getByLabelText("Código de verificação"), "123456");
     await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
-    expect(onLogin).toHaveBeenLastCalledWith("ana@x.com", "segredo", "123456");
+    expect(onLogin).toHaveBeenLastCalledWith("ana@x.com", "segredo", "123456", 1);
+    expect(onLogin).toHaveBeenCalledTimes(2);
+  });
+
+  it("entra com chave de API", async () => {
+    const { props } = setup({ status: "unauthenticated", email: null, entries: [] });
+    await userEvent.click(screen.getByRole("button", { name: "Entrar com chave de API" }));
+    await userEvent.type(screen.getByLabelText("client_id"), "user.abc");
+    await userEvent.type(screen.getByLabelText("client_secret"), "xyz");
+    await userEvent.click(screen.getByRole("button", { name: "Entrar com a chave" }));
+    expect(props.onLoginApiKey).toHaveBeenCalledWith("user.abc", "xyz");
+    expect(screen.queryByLabelText("client_secret")).not.toBeInTheDocument();
+  });
+
+  it("confirmação de novo dispositivo abre a chave de API", async () => {
+    const msg = "O Bitwarden pediu para confirmar este computador. Entre com a chave de API (abaixo) — é o jeito oficial para isso.";
+    setup({ status: "unauthenticated", email: null, entries: [] }, { onLogin: vi.fn(async () => msg) });
+    await userEvent.type(screen.getByLabelText("E-mail"), "ana@x.com");
+    await userEvent.type(screen.getByLabelText("Senha mestra"), "segredo");
+    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+    expect(await screen.findByLabelText("client_id")).toBeInTheDocument();
   });
 
   it("desbloqueia", async () => {

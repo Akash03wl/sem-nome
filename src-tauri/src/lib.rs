@@ -52,7 +52,6 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             library_cmds::get_library,
             library_cmds::get_discovered,
@@ -73,6 +72,7 @@ pub fn run() {
             files_cmds::reveal_path,
             vault_cmds::vault_status,
             vault_cmds::vault_login,
+            vault_cmds::vault_login_apikey,
             vault_cmds::vault_unlock,
             vault_cmds::vault_lock,
             vault_cmds::vault_logout,

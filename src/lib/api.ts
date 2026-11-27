@@ -131,8 +131,14 @@ export async function fixEverything(status: EverythingStatus): Promise<string | 
 
 export const vaultStatus = () => invoke<VaultView>("vault_status").catch(() => null);
 
-export const vaultLogin = (email: string, password: string, code?: string) =>
-  attempt(() => invoke("vault_login", { email, password, code: code ?? null }), "Não consegui entrar no Bitwarden.");
+export const vaultLogin = (email: string, password: string, code?: string, method?: number) =>
+  attempt(
+    () => invoke("vault_login", { email, password, code: code ?? null, method: method ?? null }),
+    "Não consegui entrar no Bitwarden.",
+  );
+
+export const vaultLoginApiKey = (clientId: string, clientSecret: string) =>
+  attempt(() => invoke("vault_login_apikey", { clientId, clientSecret }), "Não consegui entrar com a chave de API.");
 
 export const vaultUnlock = (password: string) =>
   attempt(() => invoke("vault_unlock", { password }), "Não consegui desbloquear o cofre.");

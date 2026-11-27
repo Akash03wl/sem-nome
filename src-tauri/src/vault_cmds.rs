@@ -5,11 +5,10 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_clipboard_manager::ClipboardExt;
 use vitra_core::items::normalize_url;
 use vitra_core::vault::{
-    classify_login_error, parse_items, parse_status, should_clear_clipboard, should_lock, VaultEntry,
-    VaultSecret, VaultStatus,
+    classify_login_error, parse_items, parse_status, should_clear_clipboard, should_lock, SessionGuard,
+    VaultEntry, VaultSecret, VaultStatus,
 };
 use zeroize::Zeroizing;
 
@@ -26,11 +25,19 @@ pub struct VaultState {
     pub items: Vec<VaultSecret>,
     pub last_used: Instant,
     pub email: Option<String>,
+    /// Cada trava invalida operações que começaram antes dela (sincronizar, entrar).
+    pub guard: SessionGuard,
 }
 
 impl Default for VaultState {
     fn default() -> Self {
-        VaultState { session: None, items: Vec::new(), last_used: Instant::now(), email: None }
+        VaultState {
+            session: None,
+            items: Vec::new(),
+            last_used: Instant::now(),
+            email: None,
+            guard: SessionGuard::default(),
+        }
     }
 }
 
@@ -38,7 +45,53 @@ impl VaultState {
     fn clear(&mut self) {
         self.session = None;
         self.items.clear();
+        self.guard.invalidate();
     }
+}
+
+/// Marca o início de uma operação lenta; o resultado só vale se o cofre não foi travado no meio.
+fn begin(app: &AppHandle) -> u64 {
+    app.state::<AppState>().vault.lock().unwrap().guard.begin()
+}
+
+/// Escreve na área de transferência. Segredos ficam fora do histórico (Win+V),
+/// da área de transferência na nuvem e de programas que monitoram a área de transferência.
+fn clipboard_write(text: &str, secret: bool) -> Result<(), String> {
+    let mut cb = arboard::Clipboard::new().map_err(|_| "Não consegui usar a área de transferência.".to_string())?;
+    let result = if secret {
+        #[cfg(windows)]
+        {
+            use arboard::SetExtWindows;
+            cb.set().exclude_from_history().exclude_from_cloud().exclude_from_monitoring().text(text)
+        }
+        #[cfg(not(windows))]
+        {
+            cb.set_text(text)
+        }
+    } else {
+        cb.set_text(text)
+    };
+    result.map_err(|_| "Não consegui copiar.".to_string())
+}
+
+/// Depois de 30 s, apaga a área de transferência se ela ainda tiver o segredo.
+fn schedule_clear(value: Zeroizing<String>) {
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(CLIPBOARD_SECONDS));
+        // Outro programa pode estar usando a área de transferência: tenta algumas vezes.
+        for _ in 0..5 {
+            if let Ok(mut cb) = arboard::Clipboard::new() {
+                if let Ok(current) = cb.get_text() {
+                    let current = Zeroizing::new(current);
+                    if should_clear_clipboard(&current, &value) {
+                        let _ = cb.clear();
+                    }
+                    return;
+                }
+            }
+            std::thread::sleep(Duration::from_millis(300));
+        }
+    });
 }
 
 #[derive(Serialize, Clone)]
@@ -85,14 +138,20 @@ fn publish(app: &AppHandle) -> VaultView {
     view
 }
 
-/// Guarda a sessão, sincroniza e carrega as contas.
-fn open_session(app: &AppHandle, session: Zeroizing<String>) -> Result<VaultView, String> {
+/// Guarda a sessão, sincroniza e carrega as contas — só se o cofre não foi travado
+/// depois que a operação começou (`token`).
+fn open_session(app: &AppHandle, session: Zeroizing<String>, token: u64) -> Result<VaultView, String> {
     let _ = bw::run(&["sync"], Some(&session), None);
     let json = Zeroizing::new(bw::run(&["list", "items"], Some(&session), None)?);
     let items = parse_items(&json)?;
     {
         let st = app.state::<AppState>();
         let mut v = st.vault.lock().unwrap();
+        if !v.guard.still_valid(token) {
+            drop(v);
+            let _ = bw::run(&["lock"], None, None);
+            return Ok(publish(app));
+        }
         v.session = Some(session);
         v.items = items;
         v.last_used = Instant::now();
@@ -117,35 +176,52 @@ pub async fn vault_login(
     email: String,
     password: String,
     code: Option<String>,
+    method: Option<u8>,
 ) -> Result<VaultView, String> {
     let password = Zeroizing::new(password);
+    let token = begin(&app);
     blocking(move || {
         let email = email.trim().to_string();
         if email.is_empty() || password.is_empty() {
             return Err("Digite o e-mail e a senha mestra.".to_string());
         }
-        let pw_flag = bw::password_env();
+        let mut args = vec!["login", email.as_str(), "--passwordenv", bw::password_env(), "--raw"];
         let code = code.map(|c| c.trim().to_string()).filter(|c| !c.is_empty());
-        let args = vec!["login", email.as_str(), "--passwordenv", pw_flag, "--raw"];
-        // Com código: tenta como app autenticador (método 0) e, se não servir, como e-mail (método 1).
-        let attempts: Vec<Vec<&str>> = match &code {
-            None => vec![args.clone()],
-            Some(c) => vec![
-                [args.as_slice(), &["--method", "0", "--code", c.as_str()]].concat(),
-                [args.as_slice(), &["--method", "1", "--code", c.as_str()]].concat(),
-            ],
+        // Uma tentativa só, com o método que o dono escolheu (0 = app, 1 = e-mail):
+        // tentar outro método por conta própria gera avisos de "login falhou" no Bitwarden.
+        let method = match method.unwrap_or(0) {
+            0 => "0",
+            1 => "1",
+            _ => return Err("Método de verificação inválido.".to_string()),
         };
-        let mut last_err = String::new();
-        for a in attempts {
-            match bw::run(&a, None, Some(&password)) {
-                Ok(session) => {
-                    app.state::<AppState>().vault.lock().unwrap().email = Some(email.clone());
-                    return open_session(&app, Zeroizing::new(session));
-                }
-                Err(e) => last_err = e,
-            }
+        if let Some(c) = &code {
+            args.extend(["--method", method, "--code", c.as_str()]);
         }
-        Err(classify_login_error(&last_err).to_string())
+        let session = bw::run(&args, None, Some(&password)).map_err(|e| classify_login_error(&e).to_string())?;
+        app.state::<AppState>().vault.lock().unwrap().email = Some(email.clone());
+        open_session(&app, Zeroizing::new(session), token)
+    })
+    .await?
+}
+
+/// Login com a chave de API (passa pela confirmação de novo dispositivo). O cofre fica
+/// travado em seguida: o dono desbloqueia com a senha mestra.
+#[tauri::command]
+pub async fn vault_login_apikey(app: AppHandle, client_id: String, client_secret: String) -> Result<VaultView, String> {
+    let secret = Zeroizing::new(client_secret);
+    blocking(move || {
+        let id = client_id.trim().to_string();
+        if id.is_empty() || secret.trim().is_empty() {
+            return Err("Cole o client_id e o client_secret.".to_string());
+        }
+        bw::run_env(
+            &["login", "--apikey"],
+            None,
+            None,
+            &[("BW_CLIENTID", id.as_str()), ("BW_CLIENTSECRET", secret.trim())],
+        )
+        .map_err(|e| classify_login_error(&e).to_string())?;
+        Ok(publish(&app))
     })
     .await?
 }
@@ -153,13 +229,14 @@ pub async fn vault_login(
 #[tauri::command]
 pub async fn vault_unlock(app: AppHandle, password: String) -> Result<VaultView, String> {
     let password = Zeroizing::new(password);
+    let token = begin(&app);
     blocking(move || {
         if password.is_empty() {
             return Err("Digite a senha mestra.".to_string());
         }
         let session = bw::run(&["unlock", "--passwordenv", bw::password_env(), "--raw"], None, Some(&password))
             .map_err(|e| classify_login_error(&e).to_string())?;
-        open_session(&app, Zeroizing::new(session))
+        open_session(&app, Zeroizing::new(session), token)
     })
     .await?
 }
@@ -192,9 +269,13 @@ pub async fn vault_logout(app: AppHandle) -> Result<VaultView, String> {
 #[tauri::command]
 pub async fn vault_sync(app: AppHandle) -> Result<VaultView, String> {
     blocking(move || {
-        let session = app.state::<AppState>().vault.lock().unwrap().session.clone();
+        let (session, token) = {
+            let st = app.state::<AppState>();
+            let v = st.vault.lock().unwrap();
+            (v.session.clone(), v.guard.begin())
+        };
         match session {
-            Some(s) => open_session(&app, s),
+            Some(s) => open_session(&app, s, token),
             None => Ok(publish(&app)),
         }
     })
@@ -224,18 +305,10 @@ pub async fn vault_copy(app: AppHandle, id: String, field: String) -> Result<(),
             ),
             _ => return Err("Campo inválido.".to_string()),
         };
-        app.clipboard()
-            .write_text(value.as_str())
-            .map_err(|_| "Não consegui copiar.".to_string())?;
-        if field != "username" {
-            let app2 = app.clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_secs(CLIPBOARD_SECONDS));
-                let current = Zeroizing::new(app2.clipboard().read_text().unwrap_or_default());
-                if should_clear_clipboard(&current, &value) {
-                    let _ = app2.clipboard().clear();
-                }
-            });
+        let secret_field = field != "username";
+        clipboard_write(&value, secret_field)?;
+        if secret_field {
+            schedule_clear(value);
         }
         Ok(())
     })

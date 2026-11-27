@@ -130,6 +130,7 @@ function PanelVault() {
       onInstall={api.vaultInstallCli}
       onCreateAccount={() => void api.openUrl(api.BITWARDEN_SIGNUP)}
       onLogin={api.vaultLogin}
+      onLoginApiKey={api.vaultLoginApiKey}
       onUnlock={api.vaultUnlock}
       onLock={api.vaultLock}
       onLogout={api.vaultLogout}
