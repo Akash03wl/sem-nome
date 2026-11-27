@@ -7,6 +7,7 @@ Launcher para Windows: todos os seus programas, pastas, arquivos, sites e senhas
 - Plano da Fase 2: [docs/superpowers/plans/2026-11-26-vitra-fase-2-itens.md](docs/superpowers/plans/2026-11-26-vitra-fase-2-itens.md)
 - Plano da Fase 3: [docs/superpowers/plans/2026-11-26-vitra-fase-3-busca.md](docs/superpowers/plans/2026-11-26-vitra-fase-3-busca.md)
 - Plano da Fase 4: [docs/superpowers/plans/2026-11-26-vitra-fase-4-arquivos.md](docs/superpowers/plans/2026-11-26-vitra-fase-4-arquivos.md)
+- Plano da Fase 5: [docs/superpowers/plans/2026-11-27-vitra-fase-5-senhas.md](docs/superpowers/plans/2026-11-27-vitra-fase-5-senhas.md)
 
 ## Como instalar
 
@@ -55,6 +56,18 @@ Depois de instalado, o Vitra fica perto do relógio. Aperte **Alt+Espaço** para
 - [ ] Buscar um arquivo pelo nome (ex.: `relatório`): aparece em **Arquivos**, no fim da lista
 - [ ] Enter abre o arquivo; Shift+Enter abre a pasta dele
 - [ ] Fechar o Everything e buscar de novo: aparece "O Everything está fechado." com o botão **Abrir Everything**
+
+## Checklist de teste da Fase 5 (Senhas)
+
+- [ ] Painel → **Senhas**: se pedir, clique em **Instalar ferramenta do Bitwarden**
+- [ ] **Criar conta grátis** abre o site do Bitwarden; crie a conta lá e depois entre pelo Vitra
+- [ ] Entrar com e-mail e senha mestra (se tiver 2FA, o Vitra pede o código)
+- [ ] Adicione uma conta em **Abrir no Bitwarden**, depois **Sincronizar**: ela aparece na lista
+- [ ] **Senha** copia; depois de 30 s a área de transferência fica vazia
+- [ ] Busca do pop-up (com o cofre aberto): digite o nome da conta, Enter copia a senha, Shift+Enter copia o usuário
+- [ ] Depois do tempo configurado sem usar, o cofre trava sozinho e pede a senha mestra de novo
+
+**Segurança:** o Vitra nunca grava sua senha mestra, a sessão nem as senhas em disco. As senhas ficam só na memória do Vitra enquanto o cofre está aberto, e a tela nunca recebe a senha: quem copia é o próprio Vitra.
 
 Onde o Vitra guarda seus dados: `%APPDATA%\Vitra` (configurações e itens) e `%LOCALAPPDATA%\Vitra\icons` (ícones).
 
