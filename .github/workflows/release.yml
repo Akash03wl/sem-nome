@@ -1,10 +1,16 @@
 name: Publicar versão
 
-# Ao marcar uma versão (ex.: git tag v0.1.0 && git push origin v0.1.0), gera o
-# instalador e publica em Releases, para qualquer pessoa baixar.
+# Ao marcar uma versão (ex.: git tag v0.1.0 && git push origin v0.1.0) — ou pelo botão
+# "Run workflow" na aba Actions, informando a versão — gera o instalador e publica em
+# Releases, para qualquer pessoa baixar. Pelo botão, o GitHub cria a marcação sozinho.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versão a publicar (ex.: v0.1.0)"
+        required: true
 
 permissions:
   contents: write
@@ -47,8 +53,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Vitra ${{ github.ref_name }}"
+          tagName: ${{ inputs.version || github.ref_name }}
+          releaseName: "Vitra ${{ inputs.version || github.ref_name }}"
           releaseBody: |
             ## Como instalar
 
