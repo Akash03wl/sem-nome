@@ -49,4 +49,13 @@ if ($app.HasExited) { throw "a primeira cópia fechou quando a segunda foi abert
 Write-Host "✔ instância única funciona"
 
 Stop-Process -Id $app.Id -Force
+
+$dir = Split-Path $exe
+foreach ($f in @("Everything64.dll", "Everything-SDK-LICENSE.txt")) {
+  if (-not (Test-Path (Join-Path $dir $f))) { throw "$f não foi instalado junto com o Vitra" }
+}
+Write-Host "✔ DLL e licença do Everything instaladas"
+Write-Host "---- Everything-SDK-LICENSE.txt ----"
+Get-Content (Join-Path $dir "Everything-SDK-LICENSE.txt")
+Write-Host "------------------------------------"
 Write-Host "✔ teste do app instalado passou"
