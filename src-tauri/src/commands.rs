@@ -1,7 +1,6 @@
 //! Comandos chamados pelo frontend (`src/lib/api.ts`).
 
 use tauri::{AppHandle, Emitter, State};
-use tauri_plugin_autostart::ManagerExt;
 use vitra_core::{
     hotkey,
     settings::{self, plan_save, validate_shortcut, Settings, ACCENTS, VAULT_LOCK_CHOICES},
@@ -19,10 +18,8 @@ pub fn get_hotkey_error(state: State<'_, AppState>) -> Option<String> {
     state.hotkey_error.lock().unwrap().clone()
 }
 
-fn set_autostart(app: &AppHandle, enabled: bool) -> Result<(), String> {
-    let autolaunch = app.autolaunch();
-    let result = if enabled { autolaunch.enable() } else { autolaunch.disable() };
-    result.map_err(|_| "Não consegui alterar a inicialização com o Windows.".to_string())
+fn set_autostart(_app: &AppHandle, enabled: bool) -> Result<(), String> {
+    crate::autostart::set(enabled)
 }
 
 #[tauri::command]

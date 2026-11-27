@@ -14,7 +14,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2.12", features = ["tray-icon"] }
 tauri-plugin-global-shortcut = "2.4"
-tauri-plugin-autostart = "2.7"
+auto-launch = "0.6"
 tauri-plugin-single-instance = "2.5"
 window-vibrancy = "0.8"
 serde = { version = "1", features = ["derive"] }

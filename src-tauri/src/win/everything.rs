@@ -27,6 +27,8 @@ const SORT_DATE_MODIFIED_DESCENDING: u32 = 14;
 /// Caminhos longos do Windows chegam a 32 767 caracteres.
 const MAX_PATH_WIDE: usize = 32_768;
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+/// Sintaxe do Everything: `!texto\` exclui caminhos que contêm o texto.
+const EXCLUDE: &str = "!\\WinSxS\\ !\\$Recycle.Bin\\ !\\Windows\\Installer\\";
 
 /// A DLL carregada e as funções que o Vitra usa. O SDK não é thread-safe:
 /// quem usa guarda isto atrás de um `Mutex`.
@@ -93,7 +95,9 @@ impl Everything {
 
     /// Busca até `max` resultados. Erro = código do SDK (2 = Everything fechado).
     pub fn search(&self, text: &str, max: u32) -> Result<Vec<FileHit>, u32> {
-        let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+        // Cópias internas do Windows e a lixeira só atrapalham: ficam de fora.
+        let query = format!("{text} {EXCLUDE}");
+        let wide: Vec<u16> = query.encode_utf16().chain(std::iter::once(0)).collect();
         unsafe {
             (self.set_search)(wide.as_ptr());
             (self.set_max)(max);

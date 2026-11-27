@@ -68,6 +68,26 @@ fn everything_finds_a_real_file() {
     };
     println!("{:?}", hits.iter().take(5).map(|h| &h.path).collect::<Vec<_>>());
     assert!(hits.iter().any(|h| h.path.to_lowercase().ends_with("notepad.exe") && !h.is_dir));
+    assert!(hits.iter().all(|h| !h.path.contains("\\WinSxS\\")), "cópias internas do Windows deveriam ficar de fora");
+}
+
+#[test]
+#[ignore]
+fn autostart_registers_only_for_current_user() {
+    crate::autostart::set(true).expect("ligar");
+    assert!(crate::autostart::is_enabled());
+    let hkcu = std::process::Command::new("reg")
+        .args(["query", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "Vitra"])
+        .output()
+        .unwrap();
+    assert!(hkcu.status.success(), "não está em HKCU");
+    let hklm = std::process::Command::new("reg")
+        .args(["query", "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "Vitra"])
+        .output()
+        .unwrap();
+    assert!(!hklm.status.success(), "não deveria estar em HKLM");
+    crate::autostart::set(false).expect("desligar");
+    assert!(!crate::autostart::is_enabled());
 }
 
 #[test]

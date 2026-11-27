@@ -1,3 +1,4 @@
+mod autostart;
 mod bw;
 mod commands;
 mod files_cmds;
@@ -16,7 +17,6 @@ use std::sync::Mutex;
 use std::time::Instant;
 
 use tauri::{Manager, WindowEvent};
-use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use vitra_core::library::{load_library, Library};
 use vitra_core::settings::{self, Settings};
 
@@ -45,10 +45,6 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             windows::show_quick(app);
         }))
-        .plugin(tauri_plugin_autostart::init(
-            MacosLauncher::LaunchAgent,
-            Some(vec!["--hidden"]),
-        ))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(shortcut::handler)
@@ -134,16 +130,7 @@ pub fn run() {
             tray::create(app.handle())?;
 
             // Mantém o registro do Windows igual à preferência salva.
-            let autolaunch = app.autolaunch();
-            match (loaded.autostart, autolaunch.is_enabled().unwrap_or(false)) {
-                (true, false) => {
-                    let _ = autolaunch.enable();
-                }
-                (false, true) => {
-                    let _ = autolaunch.disable();
-                }
-                _ => {}
-            }
+            autostart::sync(loaded.autostart);
 
             let registered = shortcut::register(app.handle(), &loaded.hotkey);
             smoke::note(if registered.is_ok() { "hotkey:ok" } else { "hotkey:erro" });
