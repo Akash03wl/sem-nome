@@ -5,6 +5,9 @@ mod library_cmds;
 mod vault_cmds;
 mod win;
 mod shortcut;
+mod smoke;
+#[cfg(all(test, windows))]
+mod integration_tests;
 mod tray;
 mod windows;
 
@@ -70,6 +73,7 @@ pub fn run() {
             files_cmds::everything_install,
             files_cmds::open_path,
             files_cmds::reveal_path,
+            smoke::frontend_ready,
             vault_cmds::vault_status,
             vault_cmds::vault_login,
             vault_cmds::vault_login_apikey,
@@ -141,7 +145,9 @@ pub fn run() {
                 _ => {}
             }
 
-            if let Err(msg) = shortcut::register(app.handle(), &loaded.hotkey) {
+            let registered = shortcut::register(app.handle(), &loaded.hotkey);
+            smoke::note(if registered.is_ok() { "hotkey:ok" } else { "hotkey:erro" });
+            if let Err(msg) = registered {
                 *app.state::<AppState>().hotkey_error.lock().unwrap() = Some(msg);
                 windows::open_panel(app.handle());
             }

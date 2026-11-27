@@ -177,6 +177,7 @@ function PanelApp() {
 
 const label = api.currentWindowLabel();
 document.body.classList.add(`window-${label}`);
+void api.frontendReady(label);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>{label === "quick" ? <QuickApp /> : <PanelApp />}</StrictMode>,

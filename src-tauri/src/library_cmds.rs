@@ -82,6 +82,7 @@ fn place(lib: &mut Library, category: Option<&str>, id: &str) -> Result<(), Stri
 pub fn spawn_discovery(app: AppHandle) {
     std::thread::spawn(move || {
         let list = win::discover();
+        crate::smoke::note(&format!("apps:{}", list.len()));
         *app.state::<AppState>().discovered.lock().unwrap() = list.clone();
         let _ = app.emit("apps-discovered", list);
     });

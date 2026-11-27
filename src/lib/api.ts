@@ -160,3 +160,6 @@ export const onVaultChanged = (cb: (v: VaultView) => void): Promise<UnlistenFn> 
 
 export const BITWARDEN_SIGNUP = "https://vault.bitwarden.com/#/register";
 export const BITWARDEN_VAULT = "https://vault.bitwarden.com";
+
+/** Avisa o Rust que esta janela carregou (usado pelo teste automático do app instalado). */
+export const frontendReady = (label: string) => invoke("frontend_ready", { label }).catch(() => {});
